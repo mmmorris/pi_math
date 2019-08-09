@@ -1,5 +1,5 @@
 [package]
-name = "cg2d"
+name = "triangulation"
 version = "0.1.0"
 authors = ["yineng <dev@dev.com>"]
 
