@@ -1,4 +1,4 @@
-use geo2d::{LineString, Polygon, Rect};
+use geo2d::{Polygon, Rectangle};
 use num_traits::Float;
 use std::collections::BinaryHeap;
 use std::rc::{Rc, Weak};
@@ -9,8 +9,8 @@ use super::Operation;
 pub fn fill_queue<F>(
     subject: &[Polygon<F>],
     clipping: &[Polygon<F>],
-    sbbox: &mut Rect<F>,
-    cbbox: &mut Rect<F>,
+    sbbox: &mut Rectangle<F>,
+    cbbox: &mut Rectangle<F>,
     operation: Operation,
 ) -> BinaryHeap<Rc<SweepEvent<F>>>
 where
@@ -46,7 +46,7 @@ fn process_polygon<F>(
     is_subject: bool,
     contour_id: u32,
     event_queue: &mut BinaryHeap<Rc<SweepEvent<F>>>,
-    bbox: &mut Rect<F>,
+    bbox: &mut Rectangle<F>,
     is_exterior_ring: bool,
 ) where
     F: Float,
@@ -86,13 +86,13 @@ fn process_polygon<F>(
 #[cfg(test)]
 mod test {
     use super::*;
-    use geo2d::Coordinate;
+    use geo2d::Point2;
     use std::cmp::Ordering;
     use std::collections::BinaryHeap;
     use std::rc::{Rc, Weak};
 
     fn make_simple(x: f64, y: f64, is_subject: bool) -> Rc<SweepEvent<f64>> {
-        SweepEvent::new_rc(0, Coordinate { x, y }, false, Weak::new(), is_subject, true)
+        SweepEvent::new_rc(0, Point2 { x, y }, false, Weak::new(), is_subject, true)
     }
 
     fn check_order_in_queue(first: Rc<SweepEvent<f64>>, second: Rc<SweepEvent<f64>>) {

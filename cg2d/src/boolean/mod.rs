@@ -1,2 +1,2 @@
-pub mod boolean;
 pub mod splay;
+pub mod boolean;

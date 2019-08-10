@@ -1,4 +1,4 @@
-use geo2d::Coordinate;
+use geo2d::Point2;
 use num_traits::Float;
 use std::cell::RefCell;
 use std::cmp::Ordering;
@@ -36,7 +36,7 @@ where
 {
     mutable: RefCell<MutablePart<F>>,
     pub contour_id: u32,
-    pub point: Coordinate<F>,
+    pub point: Point2<F>,
     pub is_subject: bool,
     pub is_exterior_ring: bool,
 }
@@ -47,7 +47,7 @@ where
 {
     pub fn new_rc(
         contour_id: u32,
-        point: Coordinate<F>,
+        point: Point2<F>,
         left: bool,
         other_event: Weak<SweepEvent<F>>,
         is_subject: bool,
@@ -125,7 +125,7 @@ where
         self.mutable.borrow_mut().pos = pos
     }
 
-    pub fn is_below(&self, p: Coordinate<F>) -> bool {
+    pub fn is_below(&self, p: Point2<F>) -> bool {
         if let Some(ref other_event) = self.get_other_event() {
             if self.is_left() {
                 signed_area(self.point, other_event.point, p) > F::zero()
@@ -137,7 +137,7 @@ where
         }
     }
 
-    pub fn is_above(&self, p: Coordinate<F>) -> bool {
+    pub fn is_above(&self, p: Point2<F>) -> bool {
         !self.is_below(p)
     }
 

@@ -1,4 +1,4 @@
-use geo2d::Coordinate;
+use geo2d::Point2;
 use num_traits::Float;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -7,28 +7,28 @@ where
     F: Float,
 {
     None,
-    Point(Coordinate<F>),
-    Overlap(Coordinate<F>, Coordinate<F>),
+    Point(Point2<F>),
+    Overlap(Point2<F>, Point2<F>),
 }
 
 pub fn intersection<F>(
-    a1: Coordinate<F>,
-    a2: Coordinate<F>,
-    b1: Coordinate<F>,
-    b2: Coordinate<F>,
+    a1: Point2<F>,
+    a2: Point2<F>,
+    b1: Point2<F>,
+    b2: Point2<F>,
 ) -> LineIntersection<F>
 where
     F: Float,
 {
-    let va = Coordinate {
+    let va = Point2 {
         x: a2.x - a1.x,
         y: a2.y - a1.y,
     };
-    let vb = Coordinate {
+    let vb = Point2 {
         x: b2.x - b1.x,
         y: b2.y - b1.y,
     };
-    let e = Coordinate {
+    let e = Point2 {
         x: b1.x - a1.x,
         y: b1.y - a1.y,
     };
@@ -85,18 +85,18 @@ where
     LineIntersection::None
 }
 
-fn mid_point<F>(p: Coordinate<F>, s: F, d: Coordinate<F>) -> Coordinate<F>
+fn mid_point<F>(p: Point2<F>, s: F, d: Point2<F>) -> Point2<F>
 where
     F: Float,
 {
-    Coordinate {
+    Point2 {
         x: p.x + s * d.x,
         y: p.y + s * d.y,
     }
 }
 
 #[inline]
-fn cross_product<F>(a: Coordinate<F>, b: Coordinate<F>) -> F
+fn cross_product<F>(a: Point2<F>, b: Point2<F>) -> F
 where
     F: Float,
 {
@@ -104,7 +104,7 @@ where
 }
 
 #[inline]
-fn dot_product<F>(a: Coordinate<F>, b: Coordinate<F>) -> F
+fn dot_product<F>(a: Point2<F>, b: Point2<F>) -> F
 where
     F: Float,
 {

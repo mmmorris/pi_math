@@ -1,10 +1,10 @@
 use super::sweep_event::SweepEvent;
-use geo2d::Coordinate;
+use geo2d::Point2;
 use num_traits::Float;
 use std::collections::BinaryHeap;
 use std::rc::Rc;
 
-pub fn divide_segment<F>(se: &Rc<SweepEvent<F>>, inter: Coordinate<F>, queue: &mut BinaryHeap<Rc<SweepEvent<F>>>)
+pub fn divide_segment<F>(se: &Rc<SweepEvent<F>>, inter: Point2<F>, queue: &mut BinaryHeap<Rc<SweepEvent<F>>>)
 where
     F: Float,
 {
@@ -40,7 +40,7 @@ mod test {
     use super::super::segment_intersection::{intersection, LineIntersection};
     use super::super::sweep_event::SweepEvent;
     use super::*;
-    use geo2d::Coordinate;
+    use geo2d::Point2;
     use std::collections::BinaryHeap;
     use std::rc::{Rc, Weak};
 
@@ -53,13 +53,13 @@ mod test {
     ) -> (Rc<SweepEvent<f64>>, Rc<SweepEvent<f64>>) {
         let other = SweepEvent::new_rc(
             0,
-            Coordinate { x: other_x, y: other_y },
+            Point2 { x: other_x, y: other_y },
             false,
             Weak::new(),
             is_subject,
             true,
         );
-        let event = SweepEvent::new_rc(0, Coordinate { x, y }, true, Rc::downgrade(&other), is_subject, true);
+        let event = SweepEvent::new_rc(0, Point2 { x, y }, true, Rc::downgrade(&other), is_subject, true);
 
         (event, other)
     }

@@ -1,5 +1,6 @@
-
+extern crate slab;
 extern crate cgmath;
+extern crate collision;
 extern crate num_traits;
 
 #[cfg(feature = "serde")]

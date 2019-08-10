@@ -1,8 +1,8 @@
-use geo2d::Coordinate;
+use geo2d::Point2;
 use num_traits::Float;
 
 #[inline]
-pub fn signed_area<F>(p0: Coordinate<F>, p1: Coordinate<F>, p2: Coordinate<F>) -> F
+pub fn signed_area<F>(p0: Point2<F>, p1: Point2<F>, p2: Point2<F>) -> F
 where
     F: Float,
 {

@@ -1,5 +1,4 @@
-use cgmath::{BaseFloat};
-use geo2d::{Coordinate, MultiPolygon, Polygon, Rect};
+use geo2d::{Polygon, Rectangle, Point2};
 use num_traits::{Float};
 pub mod compare_segments;
 pub mod compute_fields;
@@ -29,71 +28,71 @@ pub trait BooleanOp<F, Rhs = Self>
 where
     F: Float,
 {
-    fn boolean(&self, rhs: &Rhs, operation: Operation) -> MultiPolygon<F>;
+    fn boolean(&self, rhs: &Rhs, operation: Operation) -> Vec<Polygon<F>>;
 
-    fn intersection(&self, rhs: &Rhs) -> MultiPolygon<F> {
+    fn intersection(&self, rhs: &Rhs) -> Vec<Polygon<F>> {
         self.boolean(rhs, Operation::Intersection)
     }
 
-    fn difference(&self, rhs: &Rhs) -> MultiPolygon<F> {
+    fn difference(&self, rhs: &Rhs) -> Vec<Polygon<F>> {
         self.boolean(rhs, Operation::Difference)
     }
 
-    fn union(&self, rhs: &Rhs) -> MultiPolygon<F> {
+    fn union(&self, rhs: &Rhs) -> Vec<Polygon<F>> {
         self.boolean(rhs, Operation::Union)
     }
 
-    fn xor(&self, rhs: &Rhs) -> MultiPolygon<F> {
+    fn xor(&self, rhs: &Rhs) -> Vec<Polygon<F>> {
         self.boolean(rhs, Operation::Xor)
     }
 }
 
 impl<F> BooleanOp<F> for Polygon<F>
 where
-    F: BaseFloat,
+    F: Float,
 {
-    fn boolean(&self, rhs: &Polygon<F>, operation: Operation) -> MultiPolygon<F> {
+    fn boolean(&self, rhs: &Polygon<F>, operation: Operation) -> Vec<Polygon<F>> {
         boolean_operation(&[self.clone()], &[rhs.clone()], operation)
     }
 }
 
-impl<F> BooleanOp<F, MultiPolygon<F>> for Polygon<F>
+impl<F> BooleanOp<F, Vec<Polygon<F>>> for Polygon<F>
 where
     F: Float,
 {
-    fn boolean(&self, rhs: &MultiPolygon<F>, operation: Operation) -> MultiPolygon<F> {
-        boolean_operation(&[self.clone()], rhs.0.as_slice(), operation)
+    fn boolean(&self, rhs: &Vec<Polygon<F>>, operation: Operation) -> Vec<Polygon<F>> {
+        boolean_operation(&[self.clone()], rhs.as_slice(), operation)
     }
 }
 
-impl<F> BooleanOp<F> for MultiPolygon<F>
+impl<F> BooleanOp<F> for Vec<Polygon<F>>
 where
     F: Float,
 {
-    fn boolean(&self, rhs: &MultiPolygon<F>, operation: Operation) -> MultiPolygon<F> {
-        boolean_operation(self.0.as_slice(), rhs.0.as_slice(), operation)
+    fn boolean(&self, rhs: &Vec<Polygon<F>>, operation: Operation) -> Vec<Polygon<F>> {
+        boolean_operation(self.as_slice(), rhs.as_slice(), operation)
     }
 }
 
-impl<F> BooleanOp<F, Polygon<F>> for MultiPolygon<F>
+impl<F> BooleanOp<F, Polygon<F>> for Vec<Polygon<F>>
 where
     F: Float,
 {
-    fn boolean(&self, rhs: &Polygon<F>, operation: Operation) -> MultiPolygon<F> {
-        boolean_operation(self.0.as_slice(), &[rhs.clone()], operation)
+    fn boolean(&self, rhs: &Polygon<F>, operation: Operation) -> Vec<Polygon<F>> {
+        boolean_operation(self.as_slice(), &[rhs.clone()], operation)
     }
 }
 
-fn boolean_operation<F>(subject: &[Polygon<F>], clipping: &[Polygon<F>], operation: Operation) -> MultiPolygon<F>
+fn boolean_operation<F>(subject: &[Polygon<F>], clipping: &[Polygon<F>], operation: Operation) -> Vec<Polygon<F>>
 where
     F: Float,
 {
-    let mut sbbox = Rect {
-        min: Coordinate {
+    let mut sbbox = Rectangle {
+        min: Point2 {
             x: F::infinity(),
             y: F::infinity(),
         },
-        max: Coordinate {
+        max: Point2 {
             x: F::neg_infinity(),
             y: F::neg_infinity(),
         },
@@ -109,16 +108,16 @@ where
 
     let sorted_events = subdivide(&mut event_queue, &sbbox, &cbbox, operation);
 
-    MultiPolygon(connect_edges(&sorted_events, operation))
+    connect_edges(&sorted_events, operation)
 }
 
-fn trivial_result<F>(subject: &[Polygon<F>], clipping: &[Polygon<F>], operation: Operation) -> MultiPolygon<F>
+fn trivial_result<F>(subject: &[Polygon<F>], clipping: &[Polygon<F>], operation: Operation) -> Vec<Polygon<F>>
 where
     F: Float,
 {
     match operation {
-        Operation::Intersection => MultiPolygon(vec![]),
-        Operation::Difference => MultiPolygon(Vec::from(subject)),
-        Operation::Union | Operation::Xor => MultiPolygon(subject.iter().chain(clipping).cloned().collect()),
+        Operation::Intersection => vec![],
+        Operation::Difference => Vec::from(subject),
+        Operation::Union | Operation::Xor => subject.iter().chain(clipping).cloned().collect(),
     }
 }

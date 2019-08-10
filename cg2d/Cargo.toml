@@ -4,5 +4,10 @@ version = "0.1.0"
 authors = ["yineng <dev@dev.com>"]
 
 [dependencies]
+slab = { path = "../../pi_lib/slab" }
 cgmath = { path = "../cgmath" }
+collision = { path = "../collision" }
 num-traits = "*"
+
+[dev-dependencies]
+rand = "*"

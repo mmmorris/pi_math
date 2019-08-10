@@ -3,7 +3,6 @@ use super::sweep_event::SweepEvent;
 use num_traits::Float;
 use std::cmp::Ordering;
 use std::rc::Rc;
-
 use super::helper::less_if;
 
 pub fn compare_segments<F>(le1: &Rc<SweepEvent<F>>, le2: &Rc<SweepEvent<F>>) -> Ordering
@@ -53,11 +52,10 @@ where
 mod test {
     use super::super::sweep_event::SweepEvent;
     use super::compare_segments;
-    use crate::splay::SplaySet;
-    use geo2d::Coordinate;
     use std::cmp::Ordering;
     use std::rc::{Rc, Weak};
-
+    use geo2d::{Point2};
+    
     fn make_simple(
         contour_id: u32,
         x: f64,
@@ -68,7 +66,7 @@ mod test {
     ) -> (Rc<SweepEvent<f64>>, Rc<SweepEvent<f64>>) {
         let other = SweepEvent::new_rc(
             contour_id,
-            Coordinate { x: other_x, y: other_y },
+            Point2::<f64> { x: other_x, y: other_y },
             false,
             Weak::new(),
             is_subject,
@@ -76,7 +74,7 @@ mod test {
         );
         let event = SweepEvent::new_rc(
             contour_id,
-            Coordinate { x, y },
+            Point2::<f64> { x, y },
             true,
             Rc::downgrade(&other),
             is_subject,
@@ -84,40 +82,6 @@ mod test {
         );
 
         (event, other)
-    }
-
-    #[test]
-    fn not_collinear_shared_left_right_first() {
-        let (se1, _other1) = make_simple(0, 0.0, 0.0, 1.0, 1.0, false);
-        let (se2, _other2) = make_simple(0, 0.0, 0.0, 2.0, 3.0, false);
-
-        let mut tree = SplaySet::new(compare_segments);
-
-        tree.insert(se1);
-        tree.insert(se2);
-
-        let min_other = tree.min().unwrap().get_other_event().unwrap();
-        let max_other = tree.max().unwrap().get_other_event().unwrap();
-
-        assert_eq!(max_other.point, Coordinate { x: 2.0, y: 3.0 });
-        assert_eq!(min_other.point, Coordinate { x: 1.0, y: 1.0 });
-    }
-
-    #[test]
-    fn not_collinear_different_left_point_right_sort_y() {
-        let (se1, _other1) = make_simple(0, 0.0, 1.0, 1.0, 1.0, false);
-        let (se2, _other2) = make_simple(0, 0.0, 2.0, 2.0, 3.0, false);
-
-        let mut tree = SplaySet::new(compare_segments);
-
-        tree.insert(se1);
-        tree.insert(se2);
-
-        let min_other = tree.min().unwrap().get_other_event().unwrap();
-        let max_other = tree.max().unwrap().get_other_event().unwrap();
-
-        assert_eq!(min_other.point, Coordinate { x: 1.0, y: 1.0 });
-        assert_eq!(max_other.point, Coordinate { x: 2.0, y: 3.0 });
     }
 
     #[test]

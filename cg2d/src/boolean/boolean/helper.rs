@@ -11,10 +11,10 @@ pub fn less_if(condition: bool) -> Ordering {
 
 #[cfg(test)]
 pub mod test {
-    use geo2d::Coordinate;
+    use geo2d::Point2;
 
-    pub fn xy<X: Into<f64>, Y: Into<f64>>(x: X, y: Y) -> Coordinate<f64> {
-        Coordinate {
+    pub fn xy<X: Into<f64>, Y: Into<f64>>(x: X, y: Y) -> Point2<f64> {
+        Point2 {
             x: x.into(),
             y: y.into(),
         }

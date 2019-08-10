@@ -7,8 +7,9 @@ pub use self::tree::SplayTree;
 
 #[cfg(test)]
 mod test {
+    extern crate rand;
     use super::*;
-    use rand::random;
+    use self::rand::random;
     use std::cmp::Ordering;
     use std::i32;
 

@@ -4,15 +4,15 @@ use super::possible_intersection::possible_intersection;
 use super::sweep_event::SweepEvent;
 use super::Operation;
 use crate::splay::SplaySet;
-use geo2d::Rect;
+use geo2d::Rectangle;
 use num_traits::Float;
 use std::collections::BinaryHeap;
 use std::rc::Rc;
 
 pub fn subdivide<F>(
     event_queue: &mut BinaryHeap<Rc<SweepEvent<F>>>,
-    sbbox: &Rect<F>,
-    cbbox: &Rect<F>,
+    sbbox: &Rectangle<F>,
+    cbbox: &Rectangle<F>,
     operation: Operation,
 ) -> Vec<Rc<SweepEvent<F>>>
 where
