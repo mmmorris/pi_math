@@ -1,6 +1,6 @@
 use super::sweep_event::SweepEvent;
 use super::Operation;
-use geo2d::{Polygon};
+use geo2d::{Polygon, LineString};
 use num_traits::Float;
 use std::collections::HashSet;
 use std::rc::Rc;
@@ -92,37 +92,41 @@ where
         if processed.contains(&i) {
             continue;
         }
-        let mut contour = LineString::<F>(Vec::new());
+        let mut contour = LineString::default();
         let mut pos = i;
         let initial = result_events[i as usize].point;
 
-        contour.0.push(initial);
+        contour.push_point(initial);
 
         while pos >= i {
             processed.insert(pos);
 
             pos = result_events[pos as usize].get_pos();
             processed.insert(pos);
-            contour.0.push(result_events[pos as usize].point);
+            contour.push_point(result_events[pos as usize].point);
             pos = next_pos(pos, &result_events, &mut processed, i);
         }
 
         if !result_events[i as usize].is_exterior_ring {
             if result.is_empty() {
-                result.push(Polygon::new(contour, Vec::new()));
+                let mut p = Polygon::default();
+                p.set_exterior(&contour);
+                result.push(p);
             } else {
                 result
                     .last_mut()
                     .expect("Result must not be empty at this point")
-                    .interiors_push(contour);
+                    .push_hole(&contour);
             }
         } else if operation == Operation::Difference && !result_events[i as usize].is_subject && result.len() > 1 {
             result
                 .last_mut()
                 .expect("Result must not be empty at this point")
-                .interiors_push(contour);
+                .push_hole(&contour);
         } else {
-            result.push(Polygon::new(contour, Vec::new()));
+            let mut p = Polygon::default();
+            p.set_exterior(&contour);
+            result.push(p);
         }
     }
 

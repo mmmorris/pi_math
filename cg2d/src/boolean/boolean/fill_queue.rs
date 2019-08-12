@@ -1,4 +1,4 @@
-use geo2d::{Polygon, Rectangle};
+use geo2d::{Polygon, Rectangle, PolygonIter};
 use num_traits::Float;
 use std::collections::BinaryHeap;
 use std::rc::{Rc, Weak};
@@ -21,9 +21,9 @@ where
 
     for polygon in subject {
         contour_id += 1;
-        process_polygon(&polygon.exterior(), true, contour_id, &mut event_queue, sbbox, true);
-        for interior in polygon.interiors() {
-            process_polygon(interior, true, contour_id, &mut event_queue, sbbox, false);
+        process_polygon(polygon.exterior(), true, contour_id, &mut event_queue, sbbox, true);
+        for i in 0..polygon.hole_num() {
+            process_polygon(polygon.hole(i), true, contour_id, &mut event_queue, sbbox, false);
         }
     }
 
@@ -32,9 +32,9 @@ where
         if exterior {
             contour_id += 1;
         }
-        process_polygon(&polygon.exterior(), false, contour_id, &mut event_queue, cbbox, exterior);
-        for interior in polygon.interiors() {
-            process_polygon(interior, false, contour_id, &mut event_queue, cbbox, false);
+        process_polygon(polygon.exterior(), false, contour_id, &mut event_queue, cbbox, exterior);
+        for i in 0..polygon.hole_num() {
+            process_polygon(polygon.hole(i), false, contour_id, &mut event_queue, cbbox, false);
         }
     }
 
@@ -42,7 +42,7 @@ where
 }
 
 fn process_polygon<F>(
-    contour_or_hole: &LineString<F>,
+    contour_or_hole: PolygonIter<F>,
     is_subject: bool,
     contour_id: u32,
     event_queue: &mut BinaryHeap<Rc<SweepEvent<F>>>,
@@ -51,15 +51,15 @@ fn process_polygon<F>(
 ) where
     F: Float,
 {
-    for line in contour_or_hole.lines() {
-        if line.start == line.end {
+    for (start, end) in contour_or_hole.lines() {
+        if start == end {
             continue; // skip collapsed edges
         }
 
-        let e1 = SweepEvent::new_rc(contour_id, line.start, false, Weak::new(), is_subject, is_exterior_ring);
+        let e1 = SweepEvent::new_rc(contour_id, start.clone(), false, Weak::new(), is_subject, is_exterior_ring);
         let e2 = SweepEvent::new_rc(
             contour_id,
-            line.end,
+            end.clone(),
             false,
             Rc::downgrade(&e1),
             is_subject,
@@ -73,10 +73,10 @@ fn process_polygon<F>(
             e1.set_left(true)
         }
 
-        bbox.min.x = bbox.min.x.min(line.start.x);
-        bbox.min.y = bbox.min.y.min(line.start.y);
-        bbox.max.x = bbox.max.x.max(line.start.x);
-        bbox.max.y = bbox.max.y.max(line.start.y);
+        bbox.min.x = bbox.min.x.min(start.x);
+        bbox.min.y = bbox.min.y.min(start.y);
+        bbox.max.x = bbox.max.x.max(start.x);
+        bbox.max.y = bbox.max.y.max(start.y);
 
         event_queue.push(e1);
         event_queue.push(e2);
