@@ -1,7 +1,9 @@
 extern crate slab;
+extern crate heap;
 extern crate cgmath;
 extern crate collision;
 extern crate num_traits;
+extern crate fx_hashmap;
 
 #[cfg(feature = "serde")]
 #[macro_use]

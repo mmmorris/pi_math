@@ -1,10 +1,10 @@
 use super::sweep_event::SweepEvent;
 use geo2d::Point2;
 use num_traits::Float;
-use std::collections::BinaryHeap;
+use heap::simple_heap::{SimpleHeap};
 use std::rc::Rc;
 
-pub fn divide_segment<F>(se: &Rc<SweepEvent<F>>, inter: Point2<F>, queue: &mut BinaryHeap<Rc<SweepEvent<F>>>)
+pub fn divide_segment<F>(se: &Rc<SweepEvent<F>>, inter: Point2<F>, queue: &mut SimpleHeap<Rc<SweepEvent<F>>>)
 where
     F: Float,
 {
@@ -41,7 +41,7 @@ mod test {
     use super::super::sweep_event::SweepEvent;
     use super::*;
     use geo2d::Point2;
-    use std::collections::BinaryHeap;
+    use std::cmp::{Ordering};
     use std::rc::{Rc, Weak};
 
     fn make_simple(
@@ -68,7 +68,7 @@ mod test {
     fn devide_segments() {
         let (se1, other1) = make_simple(0.0, 0.0, 5.0, 5.0, true);
         let (se2, other2) = make_simple(0.0, 5.0, 5.0, 0.0, false);
-        let mut queue = BinaryHeap::new();
+        let mut queue = SimpleHeap::new(Ordering::Greater);
 
         queue.push(se1.clone());
         queue.push(se2.clone());

@@ -1,6 +1,7 @@
+use std::cmp::Ordering;
 use geo2d::{Polygon, Rectangle, PolygonIter};
 use num_traits::Float;
-use std::collections::BinaryHeap;
+use heap::simple_heap::{SimpleHeap};
 use std::rc::{Rc, Weak};
 
 use super::sweep_event::SweepEvent;
@@ -12,11 +13,11 @@ pub fn fill_queue<F>(
     sbbox: &mut Rectangle<F>,
     cbbox: &mut Rectangle<F>,
     operation: Operation,
-) -> BinaryHeap<Rc<SweepEvent<F>>>
+) -> SimpleHeap<Rc<SweepEvent<F>>>
 where
     F: Float,
 {
-    let mut event_queue: BinaryHeap<Rc<SweepEvent<F>>> = BinaryHeap::new();
+    let mut event_queue: SimpleHeap<Rc<SweepEvent<F>>> = SimpleHeap::new(Ordering::Greater);
     let mut contour_id = 0u32;
 
     for polygon in subject {
@@ -45,7 +46,7 @@ fn process_polygon<F>(
     contour_or_hole: PolygonIter<F>,
     is_subject: bool,
     contour_id: u32,
-    event_queue: &mut BinaryHeap<Rc<SweepEvent<F>>>,
+    event_queue: &mut SimpleHeap<Rc<SweepEvent<F>>>,
     bbox: &mut Rectangle<F>,
     is_exterior_ring: bool,
 ) where
@@ -88,7 +89,7 @@ mod test {
     use super::*;
     use geo2d::Point2;
     use std::cmp::Ordering;
-    use std::collections::BinaryHeap;
+    use heap::simple_heap::{SimpleHeap};
     use std::rc::{Rc, Weak};
 
     fn make_simple(x: f64, y: f64, is_subject: bool) -> Rc<SweepEvent<f64>> {
@@ -96,7 +97,7 @@ mod test {
     }
 
     fn check_order_in_queue(first: Rc<SweepEvent<f64>>, second: Rc<SweepEvent<f64>>) {
-        let mut queue: BinaryHeap<Rc<SweepEvent<f64>>> = BinaryHeap::new();
+        let mut queue: SimpleHeap<Rc<SweepEvent<f64>>> = SimpleHeap::new(Ordering::Greater);
 
         assert_eq!(first.cmp(&second), Ordering::Greater);
         assert_eq!(second.cmp(&first), Ordering::Less);

@@ -6,11 +6,11 @@ use super::Operation;
 use crate::splay::SplaySet;
 use geo2d::Rectangle;
 use num_traits::Float;
-use std::collections::BinaryHeap;
+use heap::simple_heap::{SimpleHeap};
 use std::rc::Rc;
 
 pub fn subdivide<F>(
-    event_queue: &mut BinaryHeap<Rc<SweepEvent<F>>>,
+    event_queue: &mut SimpleHeap<Rc<SweepEvent<F>>>,
     sbbox: &Rectangle<F>,
     cbbox: &Rectangle<F>,
     operation: Operation,

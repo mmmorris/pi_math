@@ -2,7 +2,7 @@ use super::sweep_event::SweepEvent;
 use super::Operation;
 use geo2d::{Polygon, LineString};
 use num_traits::Float;
-use std::collections::HashSet;
+use fx_hashmap::FxHashSet32;
 use std::rc::Rc;
 
 fn order_events<F>(sorted_events: &[Rc<SweepEvent<F>>]) -> Vec<Rc<SweepEvent<F>>>
@@ -47,7 +47,7 @@ where
     result_events
 }
 
-fn next_pos<F>(pos: i32, result_events: &[Rc<SweepEvent<F>>], processed: &mut HashSet<i32>, orig_index: i32) -> i32
+fn next_pos<F>(pos: i32, result_events: &[Rc<SweepEvent<F>>], processed: &mut FxHashSet32<i32>, orig_index: i32) -> i32
 where
     F: Float,
 {
@@ -86,7 +86,7 @@ where
     let result_events = order_events(sorted_events);
 
     let mut result: Vec<Polygon<F>> = Vec::new();
-    let mut processed: HashSet<i32> = HashSet::new();
+    let mut processed: FxHashSet32<i32> = FxHashSet32::default();
 
     for i in 0..(result_events.len() as i32) {
         if processed.contains(&i) {
