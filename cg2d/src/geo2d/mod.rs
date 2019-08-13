@@ -18,19 +18,54 @@ pub struct Triangle<F: Float> {
  *    + 非简单多边形：边除了顶点外，还可以自相交。
  */
 
-// 一般多边形
+/**
+ * 多边形: 可以带孔
+ * TODO: 自相交的情况没测试过!
+ * hole_indices: 放的是每个孔多边形在vertices中的索引
+ * iter
+ * 有三个遍历方法：
+ *    + for p in string.points(), 可以依次遍历所有的点
+ *    + for (pt1, pt2) = string.lines(), 可以依次遍历所有的边，分别是：(p1,p2), (p2,p3), ... (p(n-1),pn), (pn,p1)
+ *    + for (pt1, pt2, pt3) = string.triangles(), 可以依次遍历所有的前后缀点，分别是：(p1,p2,p3), (p2,p3,p4), ... (pn, p1,p2)
+ */ 
 #[derive(Clone)]
 pub struct Polygon<F: Float> {
     pub vertices: Vec<Point2<F>>,
     pub hole_indices: Vec<usize>, // 每个洞的起点在vertices数组的索引
 }
 
-// 闭合的一堆点集
+/**
+ * 首尾相连的点集: p1, p2, ..., pn
+ * 有三个遍历方法：
+ *    + for p in string.points(), 可以依次遍历所有的点
+ *    + for (pt1, pt2) = string.lines(), 可以依次遍历所有的边，分别是：(p1,p2), (p2,p3), ... (p(n-1),pn), (pn,p1)
+ *    + for (pt1, pt2, pt3) = string.triangles(), 可以依次遍历所有的前后缀点，分别是：(p1,p2,p3), (p2,p3,p4), ... (pn, p1,p2)
+ */ 
 pub struct LineString<F: Float> {
-    pub vertices: Vec<Point2<F>>, 
+    pub vertices: Vec<Point2<F>>,  // 点集
 }
 
 impl<F: Float> Polygon<F> {
+
+    pub fn new(pts: &[Point2<F>]) -> Self {
+        let mut polygon = Self {
+            vertices: vec![],
+            hole_indices: vec![],
+        };
+
+        polygon.vertices.extend_from_slice(pts);
+        polygon
+    }
+
+    pub fn new_from_linestring(exterior: &LineString<F>) -> Self {
+        let mut polygon = Self {
+            vertices: vec![],
+            hole_indices: vec![],
+        };
+
+        polygon.vertices.extend_from_slice(exterior.vertices.as_slice());
+        polygon
+    }
 
     // 设置外围多边形
     pub fn set_exterior(&mut self, string: &LineString<F>) {
@@ -44,7 +79,7 @@ impl<F: Float> Polygon<F> {
         self.vertices.extend_from_slice(string.vertices.as_slice());
     }
 
-    // 外围多边形：点
+    // 外围多边形：得到一个多边形迭代器
     pub fn exterior(&self) -> PolygonIter<F> {
         let hole_num = self.hole_indices.len();
         if hole_num > 0 {
@@ -59,7 +94,7 @@ impl<F: Float> Polygon<F> {
         self.hole_indices.len()
     }
 
-    // 第i个孔多边形的数量
+    // 第i个孔多边形的迭代器
     pub fn hole(&self, i: usize) -> PolygonIter<F> {
         let len = self.hole_indices.len();
         if i >= len {
@@ -233,5 +268,190 @@ impl<'a, F: Float> Iterator for TriIterator<'a, F> {
         } else {
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use geo2d::Point2;
+    
+    #[test]
+    fn test_linestring_iter() {
+        let pts = vec![
+            Point2::<f32>::new(-2.0, -2.0), 
+            Point2::<f32>::new( 2.0, -2.0), 
+            Point2::<f32>::new( 2.0,  2.0), 
+            Point2::<f32>::new(-2.0,  2.0)];
+
+        let line_string = LineString::new(pts.clone());
+        
+        let mut iter = line_string.points();
+        assert_eq!(iter.next(), Some(&pts[0]));
+        assert_eq!(iter.next(), Some(&pts[1]));
+        assert_eq!(iter.next(), Some(&pts[2]));
+        assert_eq!(iter.next(), Some(&pts[3]));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = line_string.lines();
+        assert_eq!(iter.next(), Some( (&pts[0], &pts[1]) ));
+        assert_eq!(iter.next(), Some( (&pts[1], &pts[2]) ));
+        assert_eq!(iter.next(), Some( (&pts[2], &pts[3]) ));
+        assert_eq!(iter.next(), Some( (&pts[3], &pts[0]) ));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = line_string.triangles();
+        assert_eq!(iter.next(), Some( (&pts[0], &pts[1], &pts[2]) ));
+        assert_eq!(iter.next(), Some( (&pts[1], &pts[2], &pts[3]) ));
+        assert_eq!(iter.next(), Some( (&pts[2], &pts[3], &pts[0]) ));
+        assert_eq!(iter.next(), Some( (&pts[3], &pts[0], &pts[1]) ));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_linestring_1_pts_iter() {
+        let pts = vec![
+            Point2::<f32>::new(-2.0, -2.0)];
+
+        let line_string = LineString::new(pts.clone());
+        
+        let mut iter = line_string.points();
+        assert_eq!(iter.next(), Some(&pts[0]));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = line_string.lines();
+        assert_eq!(iter.next(), None);
+
+        let mut iter = line_string.triangles();
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_linestring_2_pts_iter() {
+        let pts = vec![
+            Point2::<f32>::new(-2.0, -2.0), 
+            Point2::<f32>::new( 2.0, -2.0)];
+
+        let line_string = LineString::new(pts.clone());
+        
+        let mut iter = line_string.points();
+        assert_eq!(iter.next(), Some(&pts[0]));
+        assert_eq!(iter.next(), Some(&pts[1]));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = line_string.lines();
+        assert_eq!(iter.next(), Some( (&pts[0], &pts[1]) ));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = line_string.triangles();
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_linestring_3_pts_iter() {
+        let pts = vec![
+            Point2::<f32>::new(-2.0, -2.0), 
+            Point2::<f32>::new( 2.0, -2.0), 
+            Point2::<f32>::new( 2.0,  2.0)];
+
+        let line_string = LineString::new(pts.clone());
+        
+        let mut iter = line_string.points();
+        assert_eq!(iter.next(), Some(&pts[0]));
+        assert_eq!(iter.next(), Some(&pts[1]));
+        assert_eq!(iter.next(), Some(&pts[2]));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = line_string.lines();
+        assert_eq!(iter.next(), Some( (&pts[0], &pts[1]) ));
+        assert_eq!(iter.next(), Some( (&pts[1], &pts[2]) ));
+        assert_eq!(iter.next(), Some( (&pts[2], &pts[0]) ));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = line_string.triangles();
+        assert_eq!(iter.next(), Some( (&pts[0], &pts[1], &pts[2]) ));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_polygon_iter() {
+        let pts = vec![
+            Point2::<f32>::new(-2.0, -2.0), 
+            Point2::<f32>::new( 2.0, -2.0), 
+            Point2::<f32>::new( 2.0,  2.0), 
+            Point2::<f32>::new(-2.0,  2.0)];
+
+        let polygon = Polygon::<f32>::new(&pts);
+        assert_eq!(polygon.hole_num(), 0);
+
+        let piter = polygon.exterior();
+        let mut iter = piter.points();
+        assert_eq!(iter.next(), Some(&pts[0]));
+        assert_eq!(iter.next(), Some(&pts[1]));
+        assert_eq!(iter.next(), Some(&pts[2]));
+        assert_eq!(iter.next(), Some(&pts[3]));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = piter.lines();
+        assert_eq!(iter.next(), Some( (&pts[0], &pts[1]) ));
+        assert_eq!(iter.next(), Some( (&pts[1], &pts[2]) ));
+        assert_eq!(iter.next(), Some( (&pts[2], &pts[3]) ));
+        assert_eq!(iter.next(), Some( (&pts[3], &pts[0]) ));
+        assert_eq!(iter.next(), None);
+
+        let mut iter = piter.triangles();
+        assert_eq!(iter.next(), Some( (&pts[0], &pts[1], &pts[2]) ));
+        assert_eq!(iter.next(), Some( (&pts[1], &pts[2], &pts[3]) ));
+        assert_eq!(iter.next(), Some( (&pts[2], &pts[3], &pts[0]) ));
+        assert_eq!(iter.next(), Some( (&pts[3], &pts[0], &pts[1]) ));
+        assert_eq!(iter.next(), None);
+    }
+
+    #[test]
+    fn test_polygon_hole_iter() {
+        let pts = vec![
+            Point2::<f32>::new(-2.0, -2.0), 
+            Point2::<f32>::new( 2.0, -2.0), 
+            Point2::<f32>::new( 2.0,  2.0), 
+            Point2::<f32>::new(-2.0,  2.0)];
+
+        let hole1 = vec![
+            Point2::<f32>::new(-1.0, -1.0), 
+            Point2::<f32>::new(-1.0,  1.0), 
+            Point2::<f32>::new( 1.0,  1.0), 
+            Point2::<f32>::new( 1.0, -1.0)];
+
+        let hole2 = vec![
+            Point2::<f32>::new(1.7, 1.7), 
+            Point2::<f32>::new(1.9, 1.2), 
+            Point2::<f32>::new(1.7, 1.2)];
+
+        let mut polygon = Polygon::<f32>::new(&pts);
+        polygon.push_hole(&LineString::<f32>::new(hole1.clone()));
+        polygon.push_hole(&LineString::<f32>::new(hole2.clone()));
+        
+        let piter = polygon.exterior();
+        let mut iter = piter.triangles();
+        assert_eq!(iter.next(), Some( (&pts[0], &pts[1], &pts[2]) ));
+        assert_eq!(iter.next(), Some( (&pts[1], &pts[2], &pts[3]) ));
+        assert_eq!(iter.next(), Some( (&pts[2], &pts[3], &pts[0]) ));
+        assert_eq!(iter.next(), Some( (&pts[3], &pts[0], &pts[1]) ));
+        assert_eq!(iter.next(), None);
+
+        assert_eq!(polygon.hole_num(), 2);
+
+        let piter = polygon.hole(0);
+        let mut iter = piter.lines();
+        assert_eq!(iter.next(), Some( (&hole1[0], &hole1[1]) ));
+        assert_eq!(iter.next(), Some( (&hole1[1], &hole1[2]) ));
+        assert_eq!(iter.next(), Some( (&hole1[2], &hole1[3]) ));
+        assert_eq!(iter.next(), Some( (&hole1[3], &hole1[0]) ));
+        assert_eq!(iter.next(), None);
+
+        let piter = polygon.hole(1);
+        let mut iter = piter.triangles();
+        assert_eq!(iter.next(), Some( (&hole2[0], &hole2[1], &hole2[2]) ));
+        assert_eq!(iter.next(), None);
+
     }
 }
