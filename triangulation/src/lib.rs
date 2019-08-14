@@ -261,8 +261,8 @@ fn compare_x<F: Float>(a: &Node<F>, b: &Node<F>) -> std::cmp::Ordering {
 // without holes
 fn eliminate_holes<F: Float>(
     ll: &mut LinkedLists<F>,
-    data: &Vec<F>,
-    hole_indices: &Vec<usize>,
+    data: &[F],
+    hole_indices: &[usize],
     inouter_node: NodeIdx,
 ) -> NodeIdx {
     let mut outer_node = inouter_node;
@@ -628,7 +628,7 @@ fn filter_points<F: Float>(ll: &mut LinkedLists<F>, start: NodeIdx, mut end: Nod
 // create a circular doubly linked list from polygon points in the
 // specified winding order
 fn linked_list<F: Float>(
-    data: &Vec<F>,
+    data: &[F],
     start: usize,
     end: usize,
     clockwise: bool,
@@ -644,7 +644,7 @@ fn linked_list<F: Float>(
 // add new nodes to an existing linked list.
 fn linked_list_add_contour<F: Float>(
     ll: &mut LinkedLists<F>,
-    data: &Vec<F>,
+    data: &[F],
     start: usize,
     end: usize,
     clockwise: bool,
@@ -656,7 +656,7 @@ fn linked_list_add_contour<F: Float>(
     let mut leftmost_idx = NULL;
     let mut contour_minx = F::max_value();
 
-    if clockwise == (signed_area(&data, start, end) > Zero::zero()) {
+    if clockwise == (signed_area(data, start, end) > Zero::zero()) {
         for i in (start..end).step_by(DIM) {
             lastidx = ll.insert_node(i / DIM, data[i], data[i + 1], lastidx);
             if contour_minx > data[i] {
@@ -719,7 +719,7 @@ fn point_in_triangle<F: Float>(a: &Node<F>, b: &Node<F>, c: &Node<F>, p: &Node<F
         && ((b.x - p.x) * (c.y - p.y) - (c.x - p.x) * (b.y - p.y) >= Zero::zero())
 }
 
-pub fn earcut<F: Float>(data: &Vec<F>, hole_indices: &Vec<usize>, dims: usize) -> Vec<usize> {
+pub fn earcut<F: Float>(data: &[F], hole_indices: &[usize], dims: usize) -> Vec<usize> {
     let outer_len = match hole_indices.len() {
         0 => data.len(),
         _ => hole_indices[0] * DIM,
@@ -1125,18 +1125,18 @@ fn split_bridge_polygon<F: Float>(ll: &mut LinkedLists<F>, a: NodeIdx, b: NodeId
 // return a percentage difference between the polygon area and its
 // triangulation area; used to verify correctness of triangulation
 pub fn deviation<F: Float>(
-    data: &Vec<F>,
-    hole_indices: &Vec<usize>,
+    data: &[F],
+    hole_indices: &[usize],
     dims: usize,
-    triangles: &Vec<usize>,
+    triangles: &[usize],
 ) -> F {
     if DIM != dims {
         return F::nan();
     }
-    let mut indices = hole_indices.clone();
+    let mut indices = hole_indices.to_vec();
     indices.push(data.len() / DIM);
     let (ix, iy) = (indices.iter(), indices.iter().skip(1));
-    let body_area = signed_area(&data, 0, indices[0] * DIM).abs();
+    let body_area = signed_area(data, 0, indices[0] * DIM).abs();
     let polygon_area = ix.zip(iy).fold(body_area, |a, (ix, iy)| {
         a - signed_area(&data, ix * DIM, iy * DIM).abs()
     });
@@ -1155,7 +1155,7 @@ pub fn deviation<F: Float>(
     }
 }
 
-fn signed_area<F: Float>(data: &Vec<F>, start: usize, end: usize) -> F {
+fn signed_area<F: Float>(data: &[F], start: usize, end: usize) -> F {
     let i = (start..end).step_by(DIM);
     let j = (start..end).cycle().skip((end - DIM) - start).step_by(DIM);
     i.zip(j).fold(Zero::zero(), |s, (i, j)| {

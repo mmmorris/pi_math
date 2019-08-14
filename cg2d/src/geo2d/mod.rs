@@ -1,13 +1,13 @@
-use num_traits::{Float};
-
 pub use cgmath::{Vector2, Point2};
 pub use collision::{Ray2, Line2, Aabb2 as Rectangle};
 
-// 三角形，逆时针的点
-#[derive(Clone)]
-pub struct Triangle<F: Float> {
-    pub vertices: [Point2<F>; 3],
-}
+pub use boolean::boolean::{Operation as BooleanOperation};
+
+use num_traits::{Float};
+use boolean::boolean::{BooleanOp};
+use triangulation::{earcut};
+use std::slice;
+
 
 /** 
  * 多边形：一堆线段组成的区域
@@ -65,6 +65,24 @@ impl<F: Float> Polygon<F> {
 
         polygon.vertices.extend_from_slice(exterior.vertices.as_slice());
         polygon
+    }
+
+    /** 
+     * 两个多边形的布尔运算：并，交，差，异或
+     */
+    pub fn boolean(p1: &Polygon<F>, p2: &Polygon<F>, operation: BooleanOperation) -> Vec<Polygon<F>> {
+        p1.boolean(p2, operation)   
+    }
+    
+    /**
+     * 三角剖分
+     * 返回polygon里面的顶点的三角形索引列表
+     */
+    pub fn triangulation(&self) -> Vec<usize> {
+        let ptr = self.vertices.as_ptr();
+        let ptr = ptr as *const F;
+        let pts: &[F] = unsafe { slice::from_raw_parts(ptr, 2 * self.vertices.len()) };
+        earcut(pts, &self.hole_indices, 2)
     }
 
     // 设置外围多边形

@@ -1,6 +1,7 @@
 extern crate slab;
 extern crate heap;
 extern crate cgmath;
+extern crate triangulation;
 extern crate collision;
 extern crate num_traits;
 extern crate fx_hashmap;
