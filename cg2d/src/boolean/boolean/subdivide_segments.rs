@@ -3,7 +3,7 @@ use super::compute_fields::compute_fields;
 use super::possible_intersection::possible_intersection;
 use super::sweep_event::SweepEvent;
 use super::Operation;
-use crate::splay::SplaySet;
+use crate::boolean::splay::SplaySet;
 use geo2d::Rectangle;
 use num_traits::Float;
 use heap::simple_heap::{SimpleHeap};

@@ -28,5 +28,3 @@ mod boolean;
 
 pub use util::*;
 pub use geo2d::*;
-pub use boolean::*;
-
