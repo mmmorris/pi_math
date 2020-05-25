@@ -4,6 +4,7 @@ members = [
   "color",
   "octree",
   "rect_map",
+  "triangulation",
   "cgmath",
   "collision",
   "hash_value",

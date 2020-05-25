@@ -1,12 +1,15 @@
 extern crate core;
 extern crate cgmath;
-
+#[cfg(feature = "serde")]
+#[macro_use]
+extern crate serde;
 
 use cgmath::BaseFloat;
 
 /// A RGBA `Color`. Each color component is a floating point value
 /// with a range from 0 to 1.
 #[derive(Debug, Default, Copy, Clone, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Color<S> {
     pub r: S,
     pub g: S,
