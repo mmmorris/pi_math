@@ -31,7 +31,7 @@ name = "collision"
 
 [dependencies]
 num = "0.2"
-rand = "0.4"
+rand = "0.7"
 approx = "0.1"
 cgmath = {path="../cgmath"}
 # cgmath = "0.16"

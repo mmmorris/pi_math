@@ -9,4 +9,4 @@ cgmath = { path = "../cgmath" }
 collision = { path = "../collision" }
 map = { path = "../../pi_lib/map" }
 slab = { path = "../../pi_lib/slab" }
-rand = "*"
+rand = "0.7"

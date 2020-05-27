@@ -32,7 +32,7 @@ version = "0.5"
 optional = true
 
 [dependencies.num-traits]
-version = "0.1"
+version = "0.2"
 
 # [dependencies.rand]
 # version = "0.4"
