@@ -9,6 +9,9 @@ use std::str::FromStr;
 
 use rustc_serialize::hex::{ToHex, FromHex, FromHexError};
 
+/**
+* 32位hash值
+*/
 pub struct H32([u8; 4]);
 
 impl Default for H32 {
@@ -134,22 +137,45 @@ impl Hash for H32 {
 impl Eq for H32 { }
 
 impl H32 {
+    /**
+    * 获取32位hash值的数组
+    * @returns 返回32位hash值的数组
+    */
     pub fn take(self) -> [u8; 4] {
         self.0
     }
 
+    /**
+    * 获取32位hash值的字符串
+    * @returns 返回32位hash值的字符串
+    */
     pub fn tohex(&self) -> String {
         self.to_hex()
     }
 
+    /**
+    * 将32位hash值的数组，转换为32位hash值
+    * @param buf 32位hash值的数组
+    * @returns 返回32位hash值
+    */
     pub fn from_buf(buf: &[u8]) -> H32{
         H32::from(buf)
     }
 
+    /**
+    * 将32位hash值的字符串，转换为32位hash值
+    * @param hex 32位hash值的字符串
+    * @returns 返回32位hash值
+    */
     pub fn fromhex(hex: &str) -> H32{
         H32::from_str(hex).expect("string can not change to H32")
     }
 
+    /**
+    * 比较另一个32位hash值
+    * @param other 另一个32位hash值
+    * @returns 返回比较结果，-1小于，0等于，1大于
+    */
     pub fn cmp(&self, other: &H32) -> i8 {
         ord_change(&self.partial_cmp(other).unwrap())
     }
@@ -169,6 +195,9 @@ impl H32 {
     }
 }
 
+/**
+* 48位hash值
+*/
 pub struct H48([u8; 6]);
 
 impl Default for H48 {
@@ -294,22 +323,45 @@ impl Hash for H48 {
 impl Eq for H48 { }
 
 impl H48 {
+    /**
+    * 获取48位hash值的数组
+    * @returns 返回48位hash值的数组
+    */
     pub fn take(self) -> [u8; 6] {
         self.0
     }
 
+    /**
+    * 获取48位hash值的字符串
+    * @returns 返回48位hash值的字符串
+    */
     pub fn tohex(&self) -> String {
         self.to_hex()
     }
 
+    /**
+    * 将48位hash值的数组，转换为48位hash值
+    * @param buf 48位hash值的数组
+    * @returns 返回48位hash值
+    */
     pub fn from_buf(buf: &[u8]) -> H48{
         H48::from(buf)
     }
 
+    /**
+    * 将48位hash值的字符串，转换为48位hash值
+    * @param hex 48位hash值的字符串
+    * @returns 返回48位hash值
+    */
     pub fn fromhex(hex: &str) -> H48{
         H48::from_str(hex).expect("string can not change to H48")
     }
 
+    /**
+    * 比较另一个48位hash值
+    * @param other 另一个48位hash值
+    * @returns 返回比较结果，-1小于，0等于，1大于
+    */
     pub fn cmp(&self, other: &H48) -> i8 {
         ord_change(&self.partial_cmp(other).unwrap())
     }
@@ -329,6 +381,9 @@ impl H48 {
     }
 }
 
+/**
+* 160位hash值
+*/
 pub struct H160([u8; 20]);
 
 impl Default for H160 {
@@ -454,22 +509,45 @@ impl Hash for H160 {
 impl Eq for H160 { }
 
 impl H160 {
+    /**
+    * 获取160位hash值的数组
+    * @returns 返回160位hash值的数组
+    */
     pub fn take(self) -> [u8; 20] {
         self.0
     }
 
+    /**
+    * 获取160位hash值的字符串
+    * @reutrns 返回160位hash值的字符串
+    */
     pub fn tohex(&self) -> String {
         self.to_hex()
     }
 
+    /**
+    * 将160位hash值的数组，转换为160位hash值
+    * @param buf 160位hash值的数组
+    * @returns 返回160位hash值
+    */
     pub fn from_buf(buf: &[u8]) -> H160{
         H160::from(buf)
     }
 
+    /**
+    * 将160位hash值的字符串，转换为160位hash值
+    * @param hex 160位hash值的字符串
+    * @returns 返回160位hash值
+    */
     pub fn fromhex(hex: &str) -> H160{
         H160::from_str(hex).expect("string can not change to H32")
     }
 
+    /**
+    * 比较另一个160位hash值
+    * @param other 另一个160位hash值
+    * @returns 返回比较结果，-1小于，0等于，1大于
+    */
     pub fn cmp(&self, other: &H160) -> i8 {
         ord_change(&self.partial_cmp(other).unwrap())
     }
@@ -489,6 +567,9 @@ impl H160 {
     }
 }
 
+/**
+* 256位hash值
+*/
 pub struct H256([u8; 32]);
 
 impl Default for H256 {
@@ -614,22 +695,45 @@ impl Hash for H256 {
 impl Eq for H256 { }
 
 impl H256 {
+    /**
+    * 获取256位hash值的数组
+    * @returns 返回256位hash值的数组
+    */
     pub fn take(self) -> [u8; 32] {
         self.0
     }
 
+    /**
+    * 获取256位hash值的字符串
+    * @returns 返回256位hash值的字符串
+    */
     pub fn tohex(&self) -> String {
         self.to_hex()
     }
 
+    /**
+    * 将256位hash值的数组，转换为256位hash值
+    * @param buf 256位hash值的数组
+    * @param 返回256位hash值
+    */
     pub fn from_buf(buf: &[u8]) -> H256{
         H256::from(buf)
     }
 
+    /**
+    * 将256位hash值的字符串，转换为256位hash值
+    * @param hex 256位hash值的字符串
+    * @param 返回256位hash值
+    */
     pub fn fromhex(hex: &str) -> H256{
         H256::from_str(hex).expect("string can not change to H256")
     }
 
+    /**
+    * 比较另一个256位hash值
+    * @param other 另一个256位hash值
+    * @reutrns 返回比较结果，-1小于，0等于，1大于
+    */
     pub fn cmp(&self, other: &H256) -> i8 {
         ord_change(&self.partial_cmp(other).unwrap())
     }
@@ -662,6 +766,9 @@ impl H256 {
 	}
 }
 
+/**
+* 512位hash值
+*/
 pub struct H512([u8; 64]);
 
 impl Default for H512 {
@@ -787,22 +894,45 @@ impl Hash for H512 {
 impl Eq for H512 { }
 
 impl H512 {
+    /**
+    * 获取512位hash值的数组
+    * @returns 返回512位hash值的数组
+    */
     pub fn take(self) -> [u8; 64] {
         self.0
     }
 
+    /**
+    * 获取512位hash值的字符串
+    * @returns 返回512位hash值的字符串
+    */
     pub fn tohex(&self) -> String {
         self.to_hex()
     }
 
+    /**
+    * 将512位hash值的数组，转换为512位hash值
+    * @param buf 512位hash值的数组
+    * @returns 返回512位hash值
+    */
     pub fn from_buf(buf: &[u8]) -> H512{
         H512::from(buf)
     }
 
+    /**
+    * 将512位hash值的字符串，转换为512位hash值
+    * @param hex 512位hash值的字符串
+    * @returns 返回512位hash值
+    */
     pub fn fromhex(hex: &str) -> H512{
         H512::from_str(hex).expect("string can not change to H512")
     }
 
+    /**
+    * 比较另一个512位hash值
+    * @param other 另一个512位hash值
+    * @returns 返回比较结果，-1小于，0等于，1大于
+    */
     pub fn cmp(&self, other: &H512) -> i8 {
         ord_change(&self.partial_cmp(other).unwrap())
     }
@@ -822,6 +952,9 @@ impl H512 {
     }
 }
 
+/**
+* 520位hash值
+*/
 pub struct H520([u8; 65]);
 
 impl Default for H520 {
@@ -947,22 +1080,45 @@ impl Hash for H520 {
 impl Eq for H520 { }
 
 impl H520 {
+    /**
+    * 获取520位hash值的数组
+    * @returns 返回520位hash值的数组
+    */
     pub fn take(self) -> [u8; 65] {
         self.0
     }
 
+    /**
+    * 获取520位hash值的字符串
+    * @returns 返回520位hash值的字符串
+    */
     pub fn tohex(&self) -> String {
         self.to_hex()
     }
 
+    /**
+    * 将520位hash值的数组，转换为520位hash值
+    * @param buf 520位hash值的数组
+    * @returns 返回520位hash值
+    */
     pub fn from_buf(buf: &[u8]) -> H520{
         H520::from(buf)
     }
 
+    /**
+    * 将520位hash值的字符串，转换为520位hash值
+    * @param hex 520位hash值的字符串
+    * @returns 返回520位hash值
+    */
     pub fn fromhex(hex: &str) -> H520{
         H520::from_str(hex).expect("string can not change to H520")
     }
 
+    /**
+    * 比较另一个520位hash值
+    * @param other 另一个520位hash值
+    * @returns 返回比较结果，-1小于，0等于，1大于
+    */
     pub fn cmp(&self, other: &H520) -> i8 {
         ord_change(&self.partial_cmp(other).unwrap())
     }
