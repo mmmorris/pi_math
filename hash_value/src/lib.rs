@@ -1,3 +1,4 @@
+#![allow(warnings)]
 extern crate rustc_serialize;
 
 pub use rustc_serialize::hex;
