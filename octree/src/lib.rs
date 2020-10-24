@@ -534,98 +534,37 @@ fn calc_layer<S: BaseNum>(loose: &Vector3<S>, el: &Vector3<S>) -> usize {
     let min = x.min(y).min(z);
     (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize)
 }
-// 检查自己、父亲及兄弟节点
-fn check_contain<S: BaseNum>(
-    parent: &Aabb3<S>,
-    loose: &Vector3<S>,
-    node: &Aabb3<S>,
-    child: usize,
+// 判断所在的子节点
+#[inline]
+fn get_contain_child<S: BaseNum, T>(
+    parent: &OctNode<S>,
+    node: &AbNode<S, T>,
 ) -> usize {
     let two = S::one() + S::one();
-    let x1 = (parent.min.x + parent.max.x - loose.x) / two;
-    let y1 = (parent.min.y + parent.max.y - loose.y) / two;
-    let z1 = (parent.min.z + parent.max.z - loose.z) / two;
-    let x2 = (parent.min.x + parent.max.x + loose.x) / two;
-    let y2 = (parent.min.y + parent.max.y + loose.y) / two;
-    let z2 = (parent.min.z + parent.max.z + loose.z) / two;
-    let a = match child {
-        0 => Aabb3::new(Point3::new(x1, y1, z1), parent.max()),
-        1 => Aabb3::new(
-            Point3::new(parent.min.x, y1, z1),
-            Point3::new(x2, parent.max.y, parent.max.z),
-        ),
-        2 => Aabb3::new(
-            Point3::new(x1, parent.min.y, z1),
-            Point3::new(parent.max.x, y2, parent.max.z),
-        ),
-        3 => Aabb3::new(
-            Point3::new(x1, y1, parent.min.z),
-            Point3::new(parent.max.x, parent.max.y, z2),
-        ),
-        4 => Aabb3::new(
-            Point3::new(parent.min.x, parent.min.y, z1),
-            Point3::new(x2, y2, parent.max.z),
-        ),
-        5 => Aabb3::new(
-            Point3::new(parent.min.x, y1, parent.min.z),
-            Point3::new(x2, parent.max.y, z2),
-        ),
-        6 => Aabb3::new(
-            Point3::new(x1, parent.min.y, parent.min.z),
-            Point3::new(parent.max.x, y2, z2),
-        ),
-        _ => Aabb3::new(parent.min(), Point3::new(x2, y2, z2)),
-    };
-    if a.contains(node) {
-        return child;
+    let x = (parent.aabb.min.x + parent.aabb.max.x + parent.loose.x) / two;
+    let y = (parent.aabb.min.y + parent.aabb.max.y + parent.loose.y) / two;
+    let z = (parent.aabb.min.z + parent.aabb.max.z + parent.loose.z) / two;
+    get_child(x, y, z, node)
+}
+// 判断所在的子节点
+#[inline]
+fn get_child<S: BaseNum, T>(
+    x: S,
+    y: S,
+    z: S,
+    node: &AbNode<S, T>,
+) -> usize {
+    let mut i: usize = 0;
+    if node.aabb.max.x > x {
+        i += 1;
     }
-    if !parent.contains(node) {
-        return 9;
+    if node.aabb.max.y > y {
+        i += 2;
     }
-    let a = Aabb3::new(Point3::new(x1, y1, z1), parent.max());
-    if a.contains(node) {
-        return 0;
+    if node.aabb.max.z > z {
+        i += 4;
     }
-    let a = Aabb3::new(
-        Point3::new(parent.min.x, y1, z1),
-        Point3::new(x2, parent.max.y, parent.max.z),
-    );
-    if a.contains(node) {
-        return 1;
-    }
-    let a = Aabb3::new(
-        Point3::new(x1, parent.min.y, z1),
-        Point3::new(parent.max.x, y2, parent.max.z),
-    );
-    if a.contains(node) {
-        return 2;
-    }
-    let a = Aabb3::new(
-        Point3::new(parent.min.x, parent.min.y, z1),
-        Point3::new(x2, y2, parent.max.z),
-    );
-    if a.contains(node) {
-        return 4;
-    }
-    let a = Aabb3::new(
-        Point3::new(parent.min.x, y1, parent.min.z),
-        Point3::new(x2, parent.max.y, z2),
-    );
-    if a.contains(node) {
-        return 5;
-    }
-    let a = Aabb3::new(
-        Point3::new(x1, parent.min.y, parent.min.z),
-        Point3::new(parent.max.x, y2, z2),
-    );
-    if a.contains(node) {
-        return 6;
-    }
-    let a = Aabb3::new(parent.min(), Point3::new(x2, y2, z2));
-    if a.contains(node) {
-        return 7;
-    }
-    return 3;
+    i
 }
 // ab节点下降
 fn down<S: BaseNum, T>(
@@ -643,71 +582,23 @@ fn down<S: BaseNum, T>(
         parent.nodes.push(id);
         return (0, 0);
     }
-    let two = S::one() + S::one();
-    #[macro_use()]
-    macro_rules! child_macro {
-        ($a:ident, $i:tt) => {
-            if $a.contains(&node.aabb) {
-                match parent.childs[$i] {
-                    ChildNode::Oct(oct, ref mut num) => {
-                        *num += 1;
-                        return down(slab, adjust, deep, oct, node, id);
-                    }
-                    ChildNode::Ab(ref mut list) => {
-                        node.parent = oct_id;
-                        node.parent_child = $i;
-                        node.next = list.head;
-                        list.push(id);
-                        if list.len > adjust && parent.layer < deep {
-                            return set_dirty(&mut parent.dirty, $i, parent.layer, oct_id);
-                        }
-                        return (0, 0);
-                    }
-                }
+    let i: usize = get_contain_child(parent, node);
+    match parent.childs[i] {
+        ChildNode::Oct(oct, ref mut num) => {
+            *num += 1;
+            return down(slab, adjust, deep, oct, node, id);
+        }
+        ChildNode::Ab(ref mut list) => {
+            node.parent = oct_id;
+            node.parent_child = i;
+            node.next = list.head;
+            list.push(id);
+            if list.len > adjust && parent.layer < deep {
+                return set_dirty(&mut parent.dirty, i, parent.layer, oct_id);
             }
-        };
+            return (0, 0);
+        }
     }
-    let x1 = (parent.aabb.min.x + parent.aabb.max.x - parent.loose.x) / two;
-    let y1 = (parent.aabb.min.y + parent.aabb.max.y - parent.loose.y) / two;
-    let z1 = (parent.aabb.min.z + parent.aabb.max.z - parent.loose.z) / two;
-    let x2 = (parent.aabb.min.x + parent.aabb.max.x + parent.loose.x) / two;
-    let y2 = (parent.aabb.min.y + parent.aabb.max.y + parent.loose.y) / two;
-    let z2 = (parent.aabb.min.z + parent.aabb.max.z + parent.loose.z) / two;
-    let a = Aabb3::new(Point3::new(x1, y1, z1), parent.aabb.max());
-    child_macro!(a, 0);
-    let a = Aabb3::new(
-        Point3::new(parent.aabb.min.x, y1, z1),
-        Point3::new(x2, parent.aabb.max.y, parent.aabb.max.z),
-    );
-    child_macro!(a, 1);
-    let a = Aabb3::new(
-        Point3::new(x1, parent.aabb.min.y, z1),
-        Point3::new(parent.aabb.max.x, y2, parent.aabb.max.z),
-    );
-    child_macro!(a, 2);
-    let a = Aabb3::new(
-        Point3::new(x1, y1, parent.aabb.min.z),
-        Point3::new(parent.aabb.max.x, parent.aabb.max.y, z2),
-    );
-    child_macro!(a, 3);
-    let a = Aabb3::new(
-        Point3::new(parent.aabb.min.x, parent.aabb.min.y, z1),
-        Point3::new(x2, y2, parent.aabb.max.z),
-    );
-    child_macro!(a, 4);
-    let a = Aabb3::new(
-        Point3::new(parent.aabb.min.x, y1, parent.aabb.min.z),
-        Point3::new(x2, parent.aabb.max.y, z2),
-    );
-    child_macro!(a, 5);
-    let a = Aabb3::new(
-        Point3::new(x1, parent.aabb.min.y, parent.aabb.min.z),
-        Point3::new(parent.aabb.max.x, y2, z2),
-    );
-    child_macro!(a, 6);
-    let a = Aabb3::new(parent.aabb.min(), Point3::new(x2, y2, z2));
-    child_macro!(a, 7);
-    (0, 0)
 }
 // 更新aabb
 fn update<S: BaseNum, T>(
@@ -726,7 +617,7 @@ fn update<S: BaseNum, T>(
         if node.layer > parent.layer {
             // ab节点能在当前Oct节点的容纳范围
             // 获得新位置
-            let child = check_contain(&parent.aabb, &parent.loose, &node.aabb, old_c);
+            let child = get_contain_child(parent, node);
             if old_c == child {
                 return None;
             }
@@ -949,14 +840,14 @@ fn create_child<S: BaseNum>(
     let y2 = (aabb.min.y + aabb.max.y + loose.y) / two;
     let z2 = (aabb.min.z + aabb.max.z + loose.z) / two;
     let a = match child {
-        0 => Aabb3::new(Point3::new(x1, y1, z1), aabb.max()),
+        0 => Aabb3::new(aabb.min(), Point3::new(x2, y2, z2)),
         1 => Aabb3::new(
-            Point3::new(aabb.min.x, y1, z1),
-            Point3::new(x2, aabb.max.y, aabb.max.z),
+            Point3::new(x1, aabb.min.y, aabb.min.z),
+            Point3::new(aabb.max.x, y2, z2),
         ),
         2 => Aabb3::new(
-            Point3::new(x1, aabb.min.y, z1),
-            Point3::new(aabb.max.x, y2, aabb.max.z),
+            Point3::new(aabb.min.x, y1, aabb.min.z),
+            Point3::new(x2, aabb.max.y, z2),
         ),
         3 => Aabb3::new(
             Point3::new(x1, y1, aabb.min.z),
@@ -967,14 +858,14 @@ fn create_child<S: BaseNum>(
             Point3::new(x2, y2, aabb.max.z),
         ),
         5 => Aabb3::new(
-            Point3::new(aabb.min.x, y1, aabb.min.z),
-            Point3::new(x2, aabb.max.y, z2),
+            Point3::new(x1, aabb.min.y, z1),
+            Point3::new(aabb.max.x, y2, aabb.max.z),
         ),
         6 => Aabb3::new(
-            Point3::new(x1, aabb.min.y, aabb.min.z),
-            Point3::new(aabb.max.x, y2, z2),
+            Point3::new(aabb.min.x, y1, z1),
+            Point3::new(x2, aabb.max.y, aabb.max.z),
         ),
-        _ => Aabb3::new(aabb.min(), Point3::new(x2, y2, z2)),
+        _ => Aabb3::new(Point3::new(x1, y1, z1), aabb.max()),
     };
     return OctNode::new(a, loose / two, parent_id, child, layer + 1);
 }
@@ -1125,32 +1016,9 @@ fn split_down<S: BaseNum, T>(
     list: &NodeList,
 ) -> usize {
     let two = S::one() + S::one();
-    let x1 = (parent.aabb.min.x + parent.aabb.max.x - parent.loose.x) / two;
-    let y1 = (parent.aabb.min.y + parent.aabb.max.y - parent.loose.y) / two;
-    let z1 = (parent.aabb.min.z + parent.aabb.max.z - parent.loose.z) / two;
-    let x2 = (parent.aabb.min.x + parent.aabb.max.x + parent.loose.x) / two;
-    let y2 = (parent.aabb.min.y + parent.aabb.max.y + parent.loose.y) / two;
-    let z2 = (parent.aabb.min.z + parent.aabb.max.z + parent.loose.z) / two;
-    #[macro_use()]
-    macro_rules! child_macro {
-        ($a:ident, $node:ident, $id:tt, $i:tt) => {
-            if $a.contains(&$node.aabb) {
-                match parent.childs[$i] {
-                    ChildNode::Ab(ref mut list) => {
-                        $node.parent = parent_id;
-                        $node.parent_child = $i;
-                        $node.next = list.head;
-                        list.push($id);
-                        if list.len > adjust && parent.layer < deep {
-                            set_dirty(&mut parent.dirty, $i, parent.layer, parent_id);
-                        }
-                        continue;
-                    }
-                    _ => panic!("invalid state"),
-                }
-            }
-        };
-    }
+    let x = (parent.aabb.min.x + parent.aabb.max.x + parent.loose.x) / two;
+    let y = (parent.aabb.min.y + parent.aabb.max.y + parent.loose.y) / two;
+    let z = (parent.aabb.min.z + parent.aabb.max.z + parent.loose.z) / two;
     let mut id = list.head;
     while id > 0 {
         let node = unsafe { map.get_unchecked_mut(id) };
@@ -1165,40 +1033,20 @@ fn split_down<S: BaseNum, T>(
             continue;
         }
         id = node.next;
-        let a = Aabb3::new(Point3::new(x1, y1, z1), parent.aabb.max());
-        child_macro!(a, node, nid, 0);
-        let a = Aabb3::new(
-            Point3::new(parent.aabb.min.x, y1, z1),
-            Point3::new(x2, parent.aabb.max.y, parent.aabb.max.z),
-        );
-        child_macro!(a, node, nid, 1);
-        let a = Aabb3::new(
-            Point3::new(x1, parent.aabb.min.y, z1),
-            Point3::new(parent.aabb.max.x, y2, parent.aabb.max.z),
-        );
-        child_macro!(a, node, nid, 2);
-        let a = Aabb3::new(
-            Point3::new(x1, y1, parent.aabb.min.z),
-            Point3::new(parent.aabb.max.x, parent.aabb.max.y, z2),
-        );
-        child_macro!(a, node, nid, 3);
-        let a = Aabb3::new(
-            Point3::new(parent.aabb.min.x, parent.aabb.min.y, z1),
-            Point3::new(x2, y2, parent.aabb.max.z),
-        );
-        child_macro!(a, node, nid, 4);
-        let a = Aabb3::new(
-            Point3::new(parent.aabb.min.x, y1, parent.aabb.min.z),
-            Point3::new(x2, parent.aabb.max.y, z2),
-        );
-        child_macro!(a, node, nid, 5);
-        let a = Aabb3::new(
-            Point3::new(x1, parent.aabb.min.y, parent.aabb.min.z),
-            Point3::new(parent.aabb.max.x, y2, z2),
-        );
-        child_macro!(a, node, nid, 6);
-        let a = Aabb3::new(parent.aabb.min(), Point3::new(x2, y2, z2));
-        child_macro!(a, node, nid, 7);
+        let i = get_child(x, y, z, node);
+        match parent.childs[i] {
+            ChildNode::Ab(ref mut list) => {
+                node.parent = parent_id;
+                node.parent_child = i;
+                node.next = list.head;
+                list.push(nid);
+                if list.len > adjust && parent.layer < deep {
+                    set_dirty(&mut parent.dirty, i, parent.layer, parent_id);
+                }
+                continue;
+            }
+            _ => panic!("invalid state"),
+        }
     }
     fix_prev(map, parent.nodes.head);
     for i in 0..8 {
@@ -1275,16 +1123,16 @@ fn query<S: BaseNum, T, A, B>(
     let x2 = (node.aabb.min.x + node.aabb.max.x + node.loose.x) / two;
     let y2 = (node.aabb.min.y + node.aabb.max.y + node.loose.y) / two;
     let z2 = (node.aabb.min.z + node.aabb.max.z + node.loose.z) / two;
-    let a = Aabb3::new(Point3::new(x1, y1, z1), node.aabb.max());
+    let a = Aabb3::new(node.aabb.min(), Point3::new(x2, y2, z2));
     child_macro!(a, 0);
     let a = Aabb3::new(
-        Point3::new(node.aabb.min.x, y1, z1),
-        Point3::new(x2, node.aabb.max.y, node.aabb.max.z),
+        Point3::new(x1, node.aabb.min.y, node.aabb.min.z),
+        Point3::new(node.aabb.max.x, y2, z2),
     );
     child_macro!(a, 1);
     let a = Aabb3::new(
-        Point3::new(x1, node.aabb.min.y, z1),
-        Point3::new(node.aabb.max.x, y2, node.aabb.max.z),
+        Point3::new(node.aabb.min.x, y1, node.aabb.min.z),
+        Point3::new(x2, node.aabb.max.y, z2),
     );
     child_macro!(a, 2);
     let a = Aabb3::new(
@@ -1298,16 +1146,16 @@ fn query<S: BaseNum, T, A, B>(
     );
     child_macro!(a, 4);
     let a = Aabb3::new(
-        Point3::new(node.aabb.min.x, y1, node.aabb.min.z),
-        Point3::new(x2, node.aabb.max.y, z2),
+        Point3::new(x1, node.aabb.min.y, z1),
+        Point3::new(node.aabb.max.x, y2, node.aabb.max.z),
     );
     child_macro!(a, 5);
     let a = Aabb3::new(
-        Point3::new(x1, node.aabb.min.y, node.aabb.min.z),
-        Point3::new(node.aabb.max.x, y2, z2),
+        Point3::new(node.aabb.min.x, y1, z1),
+        Point3::new(x2, node.aabb.max.y, node.aabb.max.z),
     );
     child_macro!(a, 6);
-    let a = Aabb3::new(node.aabb.min(), Point3::new(x2, y2, z2));
+    let a = Aabb3::new(Point3::new(x1, y1, z1), node.aabb.max());
     child_macro!(a, 7);
 }
 
