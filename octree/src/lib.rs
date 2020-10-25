@@ -1,4 +1,6 @@
 //! 高性能的松散八叉树
+//！采用二进制掩码 表达xyz的大小， child&1 == 0 表示x为小，否则为大。
+//！采用Slab，内部用偏移量来分配八叉节点。这样内存连续，八叉树本身可以快速拷贝。
 extern crate core;
 
 extern crate cgmath;
@@ -59,8 +61,8 @@ pub struct Tree<S: BaseNum, T> {
     oct_slab: Slab<OctNode<S>>,
     ab_map: VecMap<AbNode<S, T>>,
     loose_ratio: usize,                     //松散系数，0-10000之间， 默认3000
-    adjust: (usize, usize),                 //小于min，节点收缩; 大于max，节点分化。默认(4, 5)
-    deep: usize,                            // 最大深度
+    adjust: (usize, usize),                 //小于min，节点收缩; 大于max，节点分化。默认(4, 7)
+    deep: usize,                            // 最大深度, 推荐12-16
     loose: Vector3<S>,                      //第一层的松散大小
     outer: NodeList, // 和根节点不相交的ab节点列表，及节点数量。 相交的放在root的nodes上了。 该AbNode的parent为0
     dirty: (Vec<Vec<usize>>, usize, usize), // 脏的OctNode节点, 及脏节点数量，及脏节点的起始层
@@ -440,7 +442,7 @@ const LOOSE: usize = 3000;
 const LOOSE_MAX: usize = 5000;
 const DEEP_MAX: usize = 24;
 const ADJUST_MIN: usize = 4;
-const ADJUST_MAX: usize = 5;
+const ADJUST_MAX: usize = 7;
 
 #[derive(Debug, Clone)]
 struct OctNode<S: BaseNum> {
@@ -833,39 +835,44 @@ fn create_child<S: BaseNum>(
     child: usize,
 ) -> OctNode<S> {
     let two = S::one() + S::one();
-    let x1 = (aabb.min.x + aabb.max.x - loose.x) / two;
-    let y1 = (aabb.min.y + aabb.max.y - loose.y) / two;
-    let z1 = (aabb.min.z + aabb.max.z - loose.z) / two;
-    let x2 = (aabb.min.x + aabb.max.x + loose.x) / two;
-    let y2 = (aabb.min.y + aabb.max.y + loose.y) / two;
-    let z2 = (aabb.min.z + aabb.max.z + loose.z) / two;
+    #[macro_use()]
+    macro_rules! c1 {
+        ($c:ident) => {
+            (aabb.min.$c + aabb.max.$c - loose.$c) / two
+        }
+    }
+    macro_rules! c2 {
+        ($c:ident) => {
+            (aabb.min.$c + aabb.max.$c + loose.$c) / two
+        }
+    }
     let a = match child {
-        0 => Aabb3::new(aabb.min(), Point3::new(x2, y2, z2)),
+        0 => Aabb3::new(aabb.min(), Point3::new(c2!(x), c2!(y), c2!(z))),
         1 => Aabb3::new(
-            Point3::new(x1, aabb.min.y, aabb.min.z),
-            Point3::new(aabb.max.x, y2, z2),
+            Point3::new(c1!(x), aabb.min.y, aabb.min.z),
+            Point3::new(aabb.max.x, c2!(y), c2!(z)),
         ),
         2 => Aabb3::new(
-            Point3::new(aabb.min.x, y1, aabb.min.z),
-            Point3::new(x2, aabb.max.y, z2),
+            Point3::new(aabb.min.x, c1!(y), aabb.min.z),
+            Point3::new(c2!(x), aabb.max.y, c2!(z)),
         ),
         3 => Aabb3::new(
-            Point3::new(x1, y1, aabb.min.z),
-            Point3::new(aabb.max.x, aabb.max.y, z2),
+            Point3::new(c1!(x), c1!(y), aabb.min.z),
+            Point3::new(aabb.max.x, aabb.max.y, c2!(z)),
         ),
         4 => Aabb3::new(
-            Point3::new(aabb.min.x, aabb.min.y, z1),
-            Point3::new(x2, y2, aabb.max.z),
+            Point3::new(aabb.min.x, aabb.min.y, c1!(z)),
+            Point3::new(c2!(x), c2!(y), aabb.max.z),
         ),
         5 => Aabb3::new(
-            Point3::new(x1, aabb.min.y, z1),
-            Point3::new(aabb.max.x, y2, aabb.max.z),
+            Point3::new(c1!(x), aabb.min.y, c1!(z)),
+            Point3::new(aabb.max.x, c2!(y), aabb.max.z),
         ),
         6 => Aabb3::new(
-            Point3::new(aabb.min.x, y1, z1),
-            Point3::new(x2, aabb.max.y, aabb.max.z),
+            Point3::new(aabb.min.x, c1!(y), c1!(z)),
+            Point3::new(c2!(x), aabb.max.y, aabb.max.z),
         ),
-        _ => Aabb3::new(Point3::new(x1, y1, z1), aabb.max()),
+        _ => Aabb3::new(Point3::new(c1!(x), c1!(y), c1!(z)), aabb.max()),
     };
     return OctNode::new(a, loose / two, parent_id, child, layer + 1);
 }
