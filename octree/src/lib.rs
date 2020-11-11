@@ -60,10 +60,11 @@ pub fn ab_query_func<S: BaseNum, T: Clone>(
 pub struct Tree<S: BaseNum, T> {
     oct_slab: Slab<OctNode<S>>,
     ab_map: VecMap<AbNode<S, T>>,
-    loose_ratio: usize,                     //松散系数，0-10000之间， 默认3000
+    max_loose: Vector3<S>,                      //最大松散值，第一层的松散大小
+    min_loose: Vector3<S>,                      //最小松散值
     adjust: (usize, usize),                 //小于min，节点收缩; 大于max，节点分化。默认(4, 7)
+    loose_deep: usize,                      // 最小松散值所在的深度
     deep: usize,                            // 最大深度, 推荐12-16
-    loose: Vector3<S>,                      //第一层的松散大小
     outer: NodeList, // 和根节点不相交的ab节点列表，及节点数量。 相交的放在root的nodes上了。 该AbNode的parent为0
     dirty: (Vec<Vec<usize>>, usize, usize), // 脏的OctNode节点, 及脏节点数量，及脏节点的起始层
 }
@@ -71,41 +72,12 @@ pub struct Tree<S: BaseNum, T> {
 impl<S: BaseNum, T> Tree<S, T> {
     pub fn new(
         root: Aabb3<S>,
-        loose_ratio: usize,
+        max_loose: Vector3<S>,
+        min_loose: Vector3<S>,
         adjust_min: usize,
         adjust_max: usize,
         deep: usize,
     ) -> Tree<S, T> {
-        let d = root.dim();
-        let loose_ratio = if loose_ratio == 0 { LOOSE } else { loose_ratio };
-        let loose_ratio = if loose_ratio > LOOSE_MAX {
-            LOOSE_MAX
-        } else {
-            loose_ratio
-        };
-        let lr = S::from(loose_ratio).unwrap();
-        let w = S::from(10000).unwrap();
-        let loose = Vector3::new(d.x * lr / w, d.y * lr / w, d.z * lr / w);
-        let mut s = Slab::new();
-        s.insert(OctNode::new(root, loose.clone(), 0, 0, 0));
-        let deep = if deep == 0 || deep > DEEP_MAX {
-            DEEP_MAX
-        } else {
-            deep
-        };
-        let two = S::one() + S::one();
-        let deep = if S::from(1usize).unwrap() / two == S::zero() {
-            // 如果是整数空间，则必须计算最大深度，否则会出现物件不在子节点上
-            let mut i = 0;
-            let mut l = loose / two;
-            while i < deep && l.x > S::zero() && l.y > S::zero() && l.z > S::zero() {
-                l = l / two;
-                i += 1;
-            }
-            i
-        } else {
-            deep
-        };
         let adjust_min = if adjust_min == 0 {
             ADJUST_MIN
         } else {
@@ -121,13 +93,47 @@ impl<S: BaseNum, T> Tree<S, T> {
         } else {
             adjust_max
         };
-        Tree {
-            oct_slab: s,
+        let deep = if deep > DEEP_MAX {
+            DEEP_MAX
+        } else {
+            deep
+        };
+        let mut oct_slab = Slab::new();
+        let two = S::one() + S::one();
+        let mut d = root.dim();
+        // 根据最大 最小 松散值 计算出最小松散值所在的最大的层
+        let loose_deep = calc_layer(&max_loose, &min_loose);
+        // 根据最小松散值所在的层，可计算出该层的四叉节点大小
+        let x = ((max_loose.x / d.x + S::one()) / two).to_f64().unwrap().powf(loose_deep as f64);
+        let y = ((max_loose.y / d.y + S::one()) / two).to_f64().unwrap().powf(loose_deep as f64);
+        let z = ((max_loose.z / d.z + S::one()) / two).to_f64().unwrap().powf(loose_deep as f64);
+        d.x = S::from(x * d.x.to_f64().unwrap()).unwrap();
+        d.y = S::from(y * d.y.to_f64().unwrap()).unwrap();
+        d.z = S::from(z * d.z.to_f64().unwrap()).unwrap();
+
+        let deep = if loose_deep < deep {
+            // 高于该层的节点，松散值都是用最小值， 也可计算其下每层的八叉节点的大小
+            // 八叉节点的大小如果小于最小松散值的2倍， 应该停止向下划分， 因为最小松散值占据了八叉节点的大部分
+            // 最大层由设置值和该停止划分的层的最小值
+            let mut calc_deep = loose_deep;
+            let min = min_loose * two;
+            while calc_deep < deep && d.x >= min.x && d.y >= min.y && d.z >= min.z {
+                d = d / two + min_loose;
+                calc_deep += 1;
+            }
+            calc_deep
+        }else{
+            deep
+        };
+        oct_slab.insert(OctNode::new(root, max_loose.clone(), 0, 0, 0));
+        return Tree {
+            oct_slab,
             ab_map: VecMap::default(),
-            loose_ratio: loose_ratio,
+            max_loose,
+            min_loose,
             adjust: (adjust_min, adjust_max),
-            deep: deep,
-            loose: loose,
+            loose_deep,
+            deep,
             outer: NodeList::new(),
             dirty: (Vec::new(), 0, usize::max_value()),
         }
@@ -141,21 +147,21 @@ impl<S: BaseNum, T> Tree<S, T> {
         }
         r
     }
-    // 获得松散系数
-    pub fn get_loose_ratio(&self) -> usize {
-        self.loose_ratio
-    }
     // 获得节点收缩和分化的阈值
     pub fn get_adjust(&self) -> (usize, usize) {
         (self.adjust.0, self.adjust.1)
     }
     // 获得该aabb对应的层
     pub fn get_layer(&self, aabb: &Aabb3<S>) -> usize {
-        calc_layer(&self.loose, &aabb.dim())
+        let d = aabb.dim();
+        if d.x < self.min_loose.x && d.y < self.min_loose.y && d.z < self.min_loose.z {
+            return self.deep
+        }
+        calc_layer(&self.max_loose, &d)
     }
     // 添加一个aabb及其绑定
     pub fn add(&mut self, id: usize, aabb: Aabb3<S>, bind: T) {
-        let layer = calc_layer(&self.loose, &aabb.dim());
+        let layer = self.get_layer(&aabb);
         match self.ab_map.insert(id, AbNode::new(aabb, bind, layer)) {
             Some(_) => panic!("duplicate id: {}", id),
             _ => (),
@@ -199,9 +205,10 @@ impl<S: BaseNum, T> Tree<S, T> {
     }
     // 更新指定id的aabb
     pub fn update(&mut self, id: usize, aabb: Aabb3<S>) -> bool {
+        let layer = self.get_layer(&aabb);
         let r = match self.ab_map.get_mut(id) {
             Some(node) => {
-                node.layer = calc_layer(&self.loose, &aabb.dim());
+                node.layer = layer;
                 node.aabb = aabb;
                 update(
                     &mut self.oct_slab,
@@ -296,6 +303,7 @@ impl<S: BaseNum, T> Tree<S, T> {
         if count == 0 {
             return;
         }
+        let min_loose = self.min_loose.clone();
         for i in self.dirty.2..self.dirty.0.len() {
             let vec = unsafe { self.dirty.0.get_unchecked_mut(i) };
             let c = vec.len();
@@ -310,6 +318,8 @@ impl<S: BaseNum, T> Tree<S, T> {
                     &self.adjust,
                     self.deep,
                     *oct_id,
+                    self.loose_deep,
+                    &min_loose
                 );
             }
             vec.clear();
@@ -438,9 +448,8 @@ impl NodeList {
     }
 }
 
-const LOOSE: usize = 3000;
-const LOOSE_MAX: usize = 5000;
-const DEEP_MAX: usize = 24;
+
+const DEEP_MAX: usize = 16;
 const ADJUST_MIN: usize = 4;
 const ADJUST_MAX: usize = 7;
 
@@ -832,18 +841,20 @@ fn create_child<S: BaseNum>(
     loose: &Vector3<S>,
     layer: usize,
     parent_id: usize,
+    loose_layer: usize,
+    min_loose: &Vector3<S>,
     child: usize,
 ) -> OctNode<S> {
     let two = S::one() + S::one();
     #[macro_use()]
     macro_rules! c1 {
         ($c:ident) => {
-            (aabb.min.$c + aabb.max.$c - loose.$c) / two
+            if layer < loose_layer {(aabb.min.$c + aabb.max.$c - loose.$c) / two } else {(aabb.min.$c + aabb.max.$c) / two - min_loose.$c}
         }
     }
     macro_rules! c2 {
         ($c:ident) => {
-            (aabb.min.$c + aabb.max.$c + loose.$c) / two
+            if layer < loose_layer {(aabb.min.$c + aabb.max.$c + loose.$c) / two } else {(aabb.min.$c + aabb.max.$c) / two + min_loose.$c}
         }
     }
     let a = match child {
@@ -884,6 +895,8 @@ fn collect<S: BaseNum, T>(
     adjust: &(usize, usize),
     deep: usize,
     parent_id: usize,
+    loose_layer: usize,
+    min_loose: &Vector3<S>,
 ) {
     let (dirty, childs, ab, loose, layer) = {
         let parent = match oct_slab.get_mut(parent_id) {
@@ -916,7 +929,7 @@ fn collect<S: BaseNum, T>(
                 }
                 ChildNode::Ab(ref list) if list.len > adjust.1 => {
                     let child_id = split(
-                        oct_slab, ab_map, adjust, deep, list, &ab, &loose, layer, parent_id, i,
+                        oct_slab, ab_map, adjust, deep, list, &ab, &loose, layer, parent_id, loose_layer,min_loose, i,
                     );
                     let parent = unsafe { oct_slab.get_unchecked_mut(parent_id) };
                     parent.childs[i] = ChildNode::Oct(child_id, list.len);
@@ -1003,13 +1016,15 @@ fn split<S: BaseNum, T>(
     parent_loose: &Vector3<S>,
     parent_layer: usize,
     parent_id: usize,
+    loose_layer: usize,
+    min_loose: &Vector3<S>,
     child: usize,
 ) -> usize {
-    let oct = create_child(parent_ab, parent_loose, parent_layer, parent_id, child);
+    let oct = create_child(parent_ab, parent_loose, parent_layer, parent_id, loose_layer, min_loose, child);
     let oct_id = oct_slab.insert(oct);
     let oct = unsafe { oct_slab.get_unchecked_mut(oct_id) };
     if split_down(ab_map, adjust.1, deep, oct, oct_id, list) > 0 {
-        collect(oct_slab, ab_map, adjust, deep, oct_id);
+        collect(oct_slab, ab_map, adjust, deep, oct_id, loose_layer, min_loose);
     }
     oct_id
 }
@@ -1209,13 +1224,15 @@ fn collision_list<S: BaseNum, T, A>(
 #[test]
 fn test1() {
     println!("test1-----------------------------------------");
-
+    let max = Vector3::new(100f32, 100f32, 100f32);
+    let min = max / 100f32;
     let mut tree = Tree::new(
         Aabb3::new(
             Point3::new(-1024f32, -1024f32, -4194304f32),
             Point3::new(3072f32, 3072f32, 4194304f32),
         ),
-        0,
+        max,
+        min,
         0,
         0,
         0,
@@ -1323,12 +1340,15 @@ fn test1() {
 #[test]
 fn test2() {
     println!("test2-----------------------------------------");
+    let max = Vector3::new(100f32, 100f32, 100f32);
+    let min = max / 100f32;
     let mut tree = Tree::new(
         Aabb3::new(
-            Point3::new(0f32, 0f32, 0f32),
-            Point3::new(1000f32, 1000f32, 1000f32),
+            Point3::new(-1024f32, -1024f32, -4194304f32),
+            Point3::new(3072f32, 3072f32, 4194304f32),
         ),
-        0,
+        max,
+        min,
         0,
         0,
         0,
@@ -1340,7 +1360,6 @@ fn test2() {
             i + 1,
         );
     }
-    println!("loose:{:?} deep:{}", tree.loose, tree.deep);
     for i in 1..tree.oct_slab.len() + 1 {
         println!("000000, id:{}, oct: {:?}", i, tree.oct_slab.get(i).unwrap());
     }
@@ -1367,9 +1386,15 @@ fn test2() {
         );
     }
     println!("tree -new ------------------------------------------");
+    let max = Vector3::new(100f32, 100f32, 100f32);
+    let min = max / 100f32;
     let mut tree = Tree::new(
-        Aabb3::new(Point3::new(0.0, 0.0, 0.0), Point3::new(10.0, 10.0, 10.0)),
-        0,
+        Aabb3::new(
+            Point3::new(-1024f32, -1024f32, -4194304f32),
+            Point3::new(3072f32, 3072f32, 4194304f32),
+        ),
+        max,
+        min,
         0,
         0,
         0,
@@ -1435,12 +1460,15 @@ fn test3() {
     // 	0,
     // 	0,
     // );
+    let max = Vector3::new(100f32, 100f32, 100f32);
+    let min = max / 100f32;
     let mut tree = Tree::new(
         Aabb3::new(
-            Point3::new(-1024f32, -1024f32, -z_max),
-            Point3::new(3072f32, 3072f32, z_max),
+            Point3::new(-1024f32, -1024f32, -4194304f32),
+            Point3::new(3072f32, 3072f32, 4194304f32),
         ),
-        0,
+        max,
+        min,
         0,
         0,
         0,
@@ -1712,12 +1740,15 @@ fn test4() {
     );
     let mut args: AbQueryArgs<f32, usize> = AbQueryArgs::new(aabb.clone());
 
+    let max = Vector3::new(100f32, 100f32, 100f32);
+    let min = max / 100f32;
     let mut tree = Tree::new(
         Aabb3::new(
-            Point3::new(-1024f32, -1024f32, -z_max),
-            Point3::new(3072f32, 3072f32, z_max),
+            Point3::new(-1024f32, -1024f32, -4194304f32),
+            Point3::new(3072f32, 3072f32, 4194304f32),
         ),
-        0,
+        max,
+        min,
         0,
         0,
         0,
