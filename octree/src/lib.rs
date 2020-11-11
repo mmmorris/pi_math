@@ -63,7 +63,7 @@ pub struct Tree<S: BaseNum, T> {
     max_loose: Vector3<S>,                      //最大松散值，第一层的松散大小
     min_loose: Vector3<S>,                      //最小松散值
     adjust: (usize, usize),                 //小于min，节点收缩; 大于max，节点分化。默认(4, 7)
-    loose_deep: usize,                      // 最小松散值所在的深度
+    loose_layer: usize,                      // 最小松散值所在的深度
     deep: usize,                            // 最大深度, 推荐12-16
     outer: NodeList, // 和根节点不相交的ab节点列表，及节点数量。 相交的放在root的nodes上了。 该AbNode的parent为0
     dirty: (Vec<Vec<usize>>, usize, usize), // 脏的OctNode节点, 及脏节点数量，及脏节点的起始层
@@ -101,24 +101,25 @@ impl<S: BaseNum, T> Tree<S, T> {
         let mut oct_slab = Slab::new();
         let two = S::one() + S::one();
         let mut d = root.dim();
+        let dd = Vector3::new(d.x.to_f64().unwrap(), d.y.to_f64().unwrap(), d.z.to_f64().unwrap());
         // 根据最大 最小 松散值 计算出最小松散值所在的最大的层
-        let loose_deep = calc_layer(&max_loose, &min_loose);
+        let loose_layer = calc_layer(&max_loose, &min_loose);
         // 根据最小松散值所在的层，可计算出该层的四叉节点大小
-        let x = ((max_loose.x / d.x + S::one()) / two).to_f64().unwrap().powf(loose_deep as f64);
-        let y = ((max_loose.y / d.y + S::one()) / two).to_f64().unwrap().powf(loose_deep as f64);
-        let z = ((max_loose.z / d.z + S::one()) / two).to_f64().unwrap().powf(loose_deep as f64);
-        d.x = S::from(x * d.x.to_f64().unwrap()).unwrap();
-        d.y = S::from(y * d.y.to_f64().unwrap()).unwrap();
-        d.z = S::from(z * d.z.to_f64().unwrap()).unwrap();
+        let x = ((max_loose.x.to_f64().unwrap() / dd.x + 1.0) / 2.0).powf(loose_layer as f64);
+        let y = ((max_loose.y.to_f64().unwrap() / dd.y + 1.0) / 2.0).powf(loose_layer as f64);
+        let z = ((max_loose.z.to_f64().unwrap() / dd.z + 1.0) / 2.0).powf(loose_layer as f64);
+        d.x = S::from(x * dd.x).unwrap();
+        d.y = S::from(y * dd.y).unwrap();
+        d.z = S::from(z * dd.z).unwrap();
 
-        let deep = if loose_deep < deep {
+        let deep = if loose_layer < deep {
             // 高于该层的节点，松散值都是用最小值， 也可计算其下每层的八叉节点的大小
             // 八叉节点的大小如果小于最小松散值的2倍， 应该停止向下划分， 因为最小松散值占据了八叉节点的大部分
             // 最大层由设置值和该停止划分的层的最小值
-            let mut calc_deep = loose_deep;
+            let mut calc_deep = loose_layer;
             let min = min_loose * two;
             while calc_deep < deep && d.x >= min.x && d.y >= min.y && d.z >= min.z {
-                d = d / two + min_loose;
+                d = (d + min_loose) / two;
                 calc_deep += 1;
             }
             calc_deep
@@ -132,7 +133,7 @@ impl<S: BaseNum, T> Tree<S, T> {
             max_loose,
             min_loose,
             adjust: (adjust_min, adjust_max),
-            loose_deep,
+            loose_layer,
             deep,
             outer: NodeList::new(),
             dirty: (Vec::new(), 0, usize::max_value()),
@@ -318,7 +319,7 @@ impl<S: BaseNum, T> Tree<S, T> {
                     &self.adjust,
                     self.deep,
                     *oct_id,
-                    self.loose_deep,
+                    self.loose_layer,
                     &min_loose
                 );
             }
@@ -544,6 +545,13 @@ fn calc_layer<S: BaseNum>(loose: &Vector3<S>, el: &Vector3<S>) -> usize {
     };
     let min = x.min(y).min(z);
     (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize)
+    // min.log2().ceil() as usize == (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize)
+    // fn main() {
+    // let n : usize = 119;
+    // let t = (mem::size_of::<usize>() << 3) - (n.leading_zeros() as usize)
+    // let c = (n as f64).log2().ceil();
+    // println!("{} {}", c, t);
+    // }
 }
 // 判断所在的子节点
 #[inline]
