@@ -550,7 +550,7 @@ fn calc_layer<S: BaseNum>(loose: &Vector3<S>, el: &Vector3<S>) -> usize {
     // let n : usize = 119;
     // let t = (mem::size_of::<usize>() << 3) - (n.leading_zeros() as usize)
     // let c = (n as f64).log2().ceil();
-    // println!("{} {}", c, t);
+    // println!("{} {}", c == t, t == 7);
     // }
 }
 // 判断所在的子节点
@@ -857,12 +857,12 @@ fn create_child<S: BaseNum>(
     #[macro_use()]
     macro_rules! c1 {
         ($c:ident) => {
-            if layer < loose_layer {(aabb.min.$c + aabb.max.$c - loose.$c) / two } else {(aabb.min.$c + aabb.max.$c) / two - min_loose.$c}
+            (aabb.min.$c + aabb.max.$c - loose.$c) / two
         }
     }
     macro_rules! c2 {
         ($c:ident) => {
-            if layer < loose_layer {(aabb.min.$c + aabb.max.$c + loose.$c) / two } else {(aabb.min.$c + aabb.max.$c) / two + min_loose.$c}
+            (aabb.min.$c + aabb.max.$c + loose.$c) / two
         }
     }
     let a = match child {
@@ -893,7 +893,8 @@ fn create_child<S: BaseNum>(
         ),
         _ => Aabb3::new(Point3::new(c1!(x), c1!(y), c1!(z)), aabb.max()),
     };
-    return OctNode::new(a, loose / two, parent_id, child, layer + 1);
+    let loose = if layer + 1 < loose_layer {loose / two } else {min_loose.clone()};
+    return OctNode::new(a, loose, parent_id, child, layer + 1);
 }
 
 // 整理方法，只有整理方法才会创建或销毁OctNode
