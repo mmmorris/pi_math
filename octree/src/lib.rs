@@ -155,7 +155,7 @@ impl<S: BaseNum, T> Tree<S, T> {
     // 获得该aabb对应的层
     pub fn get_layer(&self, aabb: &Aabb3<S>) -> usize {
         let d = aabb.dim();
-        if d.x < self.min_loose.x && d.y < self.min_loose.y && d.z < self.min_loose.z {
+        if d.x <= self.min_loose.x && d.y <= self.min_loose.y && d.z <= self.min_loose.z {
             return self.deep
         }
         calc_layer(&self.max_loose, &d)
@@ -544,13 +544,16 @@ fn calc_layer<S: BaseNum>(loose: &Vector3<S>, el: &Vector3<S>) -> usize {
         (loose.z / el.z).to_usize().unwrap()
     };
     let min = x.min(y).min(z);
-    (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize)
-    // min.log2().ceil() as usize == (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize)
+    if min == 0 {
+        return 0
+    }
+    (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize) - 1
+    // min.log2().floor() as usize == (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize) - 1
     // fn main() {
     // let n : usize = 119;
-    // let t = (mem::size_of::<usize>() << 3) - (n.leading_zeros() as usize)
-    // let c = (n as f64).log2().ceil();
-    // println!("{} {}", c == t, t == 7);
+    // let t = (mem::size_of::<usize>() << 3) - (n.leading_zeros() as usize) - 1
+    // let c = (n as f64).log2().floor();
+    // println!("{} {}", c == t, t == 6);
     // }
 }
 // 判断所在的子节点
@@ -893,7 +896,7 @@ fn create_child<S: BaseNum>(
         ),
         _ => Aabb3::new(Point3::new(c1!(x), c1!(y), c1!(z)), aabb.max()),
     };
-    let loose = if layer + 1 < loose_layer {loose / two } else {min_loose.clone()};
+    let loose = if layer < loose_layer {loose / two } else {min_loose.clone()};
     return OctNode::new(a, loose, parent_id, child, layer + 1);
 }
 
