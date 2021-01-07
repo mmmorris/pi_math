@@ -17,7 +17,8 @@ use map::Map;
 use slab::Slab;
 
 
-// aabb是否相交，参数a是查询参数，参数b是ab节点或oct节点的aabb， 所以最常用的判断是左闭右开
+/// oct节点查询函数的范本，aabb是否相交，参数a是查询参数，参数b是oct节点的aabb， 所以最常用的判断是左闭右开
+/// 应用方为了功能和性能，应该实现自己需要的oct节点的查询函数， 比如点查询， 球查询， 视锥体查询...
 #[inline]
 pub fn intersects<S: BaseNum>(a: &Aabb3<S>, b: &Aabb3<S>) -> bool {
     a.min.x <= b.max.x
@@ -45,7 +46,8 @@ impl<S: BaseNum, T: Clone> AbQueryArgs<S, T> {
     }
 }
 
-/// aabb的ab查询函数, aabb的oct查询函数应该使用intersects
+/// ab节点的查询函数, 这里只是一个简单范本，使用了oct节点的查询函数intersects
+/// 应用方为了功能和性能，应该实现自己需要的ab节点的查询函数， 比如点查询， 球查询-包含或相交， 视锥体查询...
 pub fn ab_query_func<S: BaseNum, T: Clone>(
     arg: &mut AbQueryArgs<S, T>,
     id: usize,
@@ -2192,10 +2194,10 @@ fn test_update() {
         //     log(&tree.oct_slab, &tree.ab_map, i);
         // }
         tree.collect();
-        let aabb = Aabb3::new(
-            Point3::new(aabb.min.x - 1.0, aabb.min.y - 1.0, aabb.min.z - 1.0),
-            Point3::new(aabb.min.x + 1.0, aabb.min.y + 1.0, aabb.min.z + 1.0),
-        );
+        // let aabb = Aabb3::new(
+        //     Point3::new(aabb.min.x - 1.0, aabb.min.y - 1.0, aabb.min.z - 1.0),
+        //     Point3::new(aabb.min.x + 1.0, aabb.min.y + 1.0, aabb.min.z + 1.0),
+        // );
         // if i == 25 {
         //     let old = clone_tree(&tree.oct_slab, &tree.ab_map);
         //     assert_eq!(check_tree(&tree.oct_slab, &tree.ab_map, old, i), false);
