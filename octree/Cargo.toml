@@ -9,4 +9,7 @@ cgmath = { path = "../cgmath" }
 collision = { path = "../collision" }
 map = { path = "../../pi_lib/map" }
 slab = { path = "../../pi_lib/slab" }
+
+[dev-dependencies]
+pcg_rand = "0.12"
 rand = "0.7"

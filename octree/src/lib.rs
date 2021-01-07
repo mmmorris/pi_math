@@ -16,6 +16,8 @@ use map::vecmap::VecMap;
 use map::Map;
 use slab::Slab;
 
+// const EPSILON: f32 = std::f32::EPSILON * 1024.0;
+
 // aabb是否相交
 #[inline]
 pub fn intersects<S: BaseNum>(a: &Aabb3<S>, b: &Aabb3<S>) -> bool {
@@ -60,10 +62,10 @@ pub fn ab_query_func<S: BaseNum, T: Clone>(
 pub struct Tree<S: BaseNum, T> {
     oct_slab: Slab<OctNode<S>>,
     ab_map: VecMap<AbNode<S, T>>,
-    max_loose: Vector3<S>,                      //最大松散值，第一层的松散大小
-    min_loose: Vector3<S>,                      //最小松散值
+    max_loose: Vector3<S>,                  //最大松散值，第一层的松散大小
+    min_loose: Vector3<S>,                  //最小松散值
     adjust: (usize, usize),                 //小于min，节点收缩; 大于max，节点分化。默认(4, 7)
-    loose_layer: usize,                      // 最小松散值所在的深度
+    loose_layer: usize,                     // 最小松散值所在的深度
     deep: usize,                            // 最大深度, 推荐12-16
     outer: NodeList, // 和根节点不相交的ab节点列表，及节点数量。 相交的放在root的nodes上了。 该AbNode的parent为0
     dirty: (Vec<Vec<usize>>, usize, usize), // 脏的OctNode节点, 及脏节点数量，及脏节点的起始层
@@ -93,15 +95,15 @@ impl<S: BaseNum, T> Tree<S, T> {
         } else {
             adjust_max
         };
-        let deep = if deep > DEEP_MAX {
-            DEEP_MAX
-        } else {
-            deep
-        };
+        let deep = if deep > DEEP_MAX { DEEP_MAX } else { deep };
         let mut oct_slab = Slab::new();
         let two = S::one() + S::one();
         let mut d = root.dim();
-        let dd = Vector3::new(d.x.to_f64().unwrap(), d.y.to_f64().unwrap(), d.z.to_f64().unwrap());
+        let dd = Vector3::new(
+            d.x.to_f64().unwrap(),
+            d.y.to_f64().unwrap(),
+            d.z.to_f64().unwrap(),
+        );
         // 根据最大 最小 松散值 计算出最小松散值所在的最大的层
         let loose_layer = calc_layer(&max_loose, &min_loose);
         // 根据最小松散值所在的层，可计算出该层的四叉节点大小
@@ -123,7 +125,7 @@ impl<S: BaseNum, T> Tree<S, T> {
                 calc_deep += 1;
             }
             calc_deep
-        }else{
+        } else {
             deep
         };
         oct_slab.insert(OctNode::new(root, max_loose.clone(), 0, 0, 0));
@@ -137,7 +139,7 @@ impl<S: BaseNum, T> Tree<S, T> {
             deep,
             outer: NodeList::new(),
             dirty: (Vec::new(), 0, usize::max_value()),
-        }
+        };
     }
     pub fn mem_size(&self) -> usize {
         let mut r = self.oct_slab.mem_size()
@@ -156,7 +158,7 @@ impl<S: BaseNum, T> Tree<S, T> {
     pub fn get_layer(&self, aabb: &Aabb3<S>) -> usize {
         let d = aabb.dim();
         if d.x <= self.min_loose.x && d.y <= self.min_loose.y && d.z <= self.min_loose.z {
-            return self.deep
+            return self.deep;
         }
         calc_layer(&self.max_loose, &d)
     }
@@ -320,7 +322,7 @@ impl<S: BaseNum, T> Tree<S, T> {
                     self.deep,
                     *oct_id,
                     self.loose_layer,
-                    &min_loose
+                    &min_loose,
                 );
             }
             vec.clear();
@@ -449,7 +451,6 @@ impl NodeList {
     }
 }
 
-
 const DEEP_MAX: usize = 16;
 const ADJUST_MIN: usize = 4;
 const ADJUST_MAX: usize = 7;
@@ -545,7 +546,7 @@ fn calc_layer<S: BaseNum>(loose: &Vector3<S>, el: &Vector3<S>) -> usize {
     };
     let min = x.min(y).min(z);
     if min == 0 {
-        return 0
+        return 0;
     }
     (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize) - 1
     // min.log2().floor() as usize == (mem::size_of::<usize>() << 3) - (min.leading_zeros() as usize) - 1
@@ -558,10 +559,7 @@ fn calc_layer<S: BaseNum>(loose: &Vector3<S>, el: &Vector3<S>) -> usize {
 }
 // 判断所在的子节点
 #[inline]
-fn get_contain_child<S: BaseNum, T>(
-    parent: &OctNode<S>,
-    node: &AbNode<S, T>,
-) -> usize {
+fn get_contain_child<S: BaseNum, T>(parent: &OctNode<S>, node: &AbNode<S, T>) -> usize {
     let two = S::one() + S::one();
     let x = (parent.aabb.min.x + parent.aabb.max.x + parent.loose.x) / two;
     let y = (parent.aabb.min.y + parent.aabb.max.y + parent.loose.y) / two;
@@ -570,12 +568,7 @@ fn get_contain_child<S: BaseNum, T>(
 }
 // 判断所在的子节点
 #[inline]
-fn get_child<S: BaseNum, T>(
-    x: S,
-    y: S,
-    z: S,
-    node: &AbNode<S, T>,
-) -> usize {
+fn get_child<S: BaseNum, T>(x: S, y: S, z: S, node: &AbNode<S, T>) -> usize {
     let mut i: usize = 0;
     if node.aabb.max.x > x {
         i += 1;
@@ -638,31 +631,33 @@ fn update<S: BaseNum, T>(
         let mut parent = unsafe { slab.get_unchecked_mut(old_p) };
         if node.layer > parent.layer {
             // ab节点能在当前Oct节点的容纳范围
-            // 获得新位置
-            let child = get_contain_child(parent, node);
-            if old_c == child {
-                return None;
-            }
-            if child < 8 {
-                let prev = node.prev;
-                let next = node.next;
-                node.prev = 0;
-                // 移动到兄弟节点
-                match parent.childs[child] {
-                    ChildNode::Oct(oct, ref mut num) => {
-                        *num += 1;
-                        node.parent_child = 8;
-                        set_tree_dirty(dirty, down(slab, adjust.1, deep, oct, node, id));
-                        return Some((old_p, old_c, prev, next, node.next));
-                    }
-                    ChildNode::Ab(ref mut list) => {
-                        node.parent_child = child;
-                        node.next = list.head;
-                        list.push(id);
-                        if list.len > adjust.1 && node.layer < deep {
-                            set_dirty(&mut parent.dirty, child, parent.layer, id);
+            if parent.aabb.contains(&node.aabb) {
+                // 获得新位置
+                let child = get_contain_child(parent, node);
+                if old_c == child {
+                    return None;
+                }
+                if child < 8 {
+                    let prev = node.prev;
+                    let next = node.next;
+                    node.prev = 0;
+                    // 移动到兄弟节点
+                    match parent.childs[child] {
+                        ChildNode::Oct(oct, ref mut num) => {
+                            *num += 1;
+                            node.parent_child = 8;
+                            set_tree_dirty(dirty, down(slab, adjust.1, deep, oct, node, id));
+                            return Some((old_p, old_c, prev, next, node.next));
                         }
-                        return Some((old_p, old_c, prev, next, node.next));
+                        ChildNode::Ab(ref mut list) => {
+                            node.parent_child = child;
+                            node.next = list.head;
+                            list.push(id);
+                            if list.len > adjust.1 && node.layer < deep {
+                                set_dirty(&mut parent.dirty, child, parent.layer, id);
+                            }
+                            return Some((old_p, old_c, prev, next, node.next));
+                        }
                     }
                 }
             }
@@ -861,12 +856,12 @@ fn create_child<S: BaseNum>(
     macro_rules! c1 {
         ($c:ident) => {
             (aabb.min.$c + aabb.max.$c - loose.$c) / two
-        }
+        };
     }
     macro_rules! c2 {
         ($c:ident) => {
             (aabb.min.$c + aabb.max.$c + loose.$c) / two
-        }
+        };
     }
     let a = match child {
         0 => Aabb3::new(aabb.min(), Point3::new(c2!(x), c2!(y), c2!(z))),
@@ -896,7 +891,11 @@ fn create_child<S: BaseNum>(
         ),
         _ => Aabb3::new(Point3::new(c1!(x), c1!(y), c1!(z)), aabb.max()),
     };
-    let loose = if layer < loose_layer {loose / two } else {min_loose.clone()};
+    let loose = if layer < loose_layer {
+        loose / two
+    } else {
+        min_loose.clone()
+    };
     return OctNode::new(a, loose, parent_id, child, layer + 1);
 }
 
@@ -941,7 +940,18 @@ fn collect<S: BaseNum, T>(
                 }
                 ChildNode::Ab(ref list) if list.len > adjust.1 => {
                     let child_id = split(
-                        oct_slab, ab_map, adjust, deep, list, &ab, &loose, layer, parent_id, loose_layer,min_loose, i,
+                        oct_slab,
+                        ab_map,
+                        adjust,
+                        deep,
+                        list,
+                        &ab,
+                        &loose,
+                        layer,
+                        parent_id,
+                        loose_layer,
+                        min_loose,
+                        i,
                     );
                     let parent = unsafe { oct_slab.get_unchecked_mut(parent_id) };
                     parent.childs[i] = ChildNode::Oct(child_id, list.len);
@@ -1032,11 +1042,27 @@ fn split<S: BaseNum, T>(
     min_loose: &Vector3<S>,
     child: usize,
 ) -> usize {
-    let oct = create_child(parent_ab, parent_loose, parent_layer, parent_id, loose_layer, min_loose, child);
+    let oct = create_child(
+        parent_ab,
+        parent_loose,
+        parent_layer,
+        parent_id,
+        loose_layer,
+        min_loose,
+        child,
+    );
     let oct_id = oct_slab.insert(oct);
     let oct = unsafe { oct_slab.get_unchecked_mut(oct_id) };
     if split_down(ab_map, adjust.1, deep, oct, oct_id, list) > 0 {
-        collect(oct_slab, ab_map, adjust, deep, oct_id, loose_layer, min_loose);
+        collect(
+            oct_slab,
+            ab_map,
+            adjust,
+            deep,
+            oct_id,
+            loose_layer,
+            min_loose,
+        );
     }
     oct_id
 }
@@ -1740,6 +1766,8 @@ fn test3() {
 }
 
 #[cfg(test)]
+extern crate pcg_rand;
+#[cfg(test)]
 extern crate rand;
 #[test]
 fn test4() {
@@ -2104,5 +2132,78 @@ fn log(oct_slab: &Slab<OctNode<f32>>, ab_map: &VecMap<AbNode<f32, usize>>, oct_i
     for (id, n) in oct_slab.iter() {
         //let r = ab_map.get(r).unwrap();
         println!("oct=========, id:{}, oct: {:?}", id, n);
+    }
+}
+
+#[test]
+fn test_update() {
+    use pcg_rand::Pcg32;
+    use rand::{Rng, SeedableRng};
+
+    let max_size = 1000.0;
+
+    let max = Vector3::new(100f32, 100f32, 100f32);
+    let min = max / 100f32;
+    let mut tree = Tree::new(
+        Aabb3::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(max_size, max_size, max_size),
+        ),
+        max,
+        min,
+        0,
+        0,
+        10,
+    );
+
+    let mut rng = pcg_rand::Pcg32::seed_from_u64(1111);
+    //println!("rr = {}", rr);
+    for i in 0..10000 {
+        //println!("i = {}", i);
+
+        let x = rng.gen_range(0.0, max_size);
+        let y = rng.gen_range(0.0, max_size);
+        let z = rng.gen_range(0.0, max_size);
+
+        tree.add(
+            i + 1,
+            Aabb3::new(Point3::new(x, y, z), Point3::new(x, y, z)),
+            i + 1,
+        );
+
+        tree.collect();
+
+        let x_: f32 = rng.gen_range(0.0, max_size);
+        let y_: f32 = rng.gen_range(0.0, max_size);
+        let z_: f32 = rng.gen_range(0.0, max_size);
+
+        // TODO: 改成 7.0 就可以了。
+        let size: f32 = 1.0;
+        let aabb = Aabb3::new(
+            Point3::new(x_, y_, z_),
+            Point3::new(x_ + size, y_ + size, z_ + size),
+        );
+
+        tree.update(i + 1, aabb.clone());
+        //tree.remove(i + 1);
+        //tree.add(i + 1, aabb.clone(), i + 1);
+        // if i == 25 {
+        //     let old = clone_tree(&tree.oct_slab, &tree.ab_map);
+        //     assert_eq!(check_tree(&tree.oct_slab, &tree.ab_map, old, i), false);
+        //     log(&tree.oct_slab, &tree.ab_map, i);
+        // }
+        tree.collect();
+        let aabb = Aabb3::new(
+            Point3::new(aabb.min.x - 1.0, aabb.min.y - 1.0, aabb.min.z - 1.0),
+            Point3::new(aabb.min.x + 1.0, aabb.min.y + 1.0, aabb.min.z + 1.0),
+        );
+        // if i == 25 {
+        //     let old = clone_tree(&tree.oct_slab, &tree.ab_map);
+        //     assert_eq!(check_tree(&tree.oct_slab, &tree.ab_map, old, i), false);
+        //     log(&tree.oct_slab, &tree.ab_map,i);
+        // }
+        let mut args: AbQueryArgs<f32, usize> = AbQueryArgs::new(aabb.clone());
+        tree.query(&aabb, intersects, &mut args, ab_query_func);
+        assert!(args.result().len() > 0);
     }
 }
