@@ -16,16 +16,15 @@ use map::vecmap::VecMap;
 use map::Map;
 use slab::Slab;
 
-// const EPSILON: f32 = std::f32::EPSILON * 1024.0;
 
-// aabb是否相交
+// aabb是否相交，参数a是查询参数，参数b是ab节点或oct节点的aabb， 所以最常用的判断是左闭右开
 #[inline]
 pub fn intersects<S: BaseNum>(a: &Aabb3<S>, b: &Aabb3<S>) -> bool {
-    a.min.x < b.max.x
+    a.min.x <= b.max.x
         && a.max.x > b.min.x
-        && a.min.y < b.max.y
+        && a.min.y <= b.max.y
         && a.max.y > b.min.y
-        && a.min.z < b.max.z
+        && a.min.z <= b.max.z
         && a.max.z > b.min.z
 }
 
