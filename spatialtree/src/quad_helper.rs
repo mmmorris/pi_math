@@ -101,7 +101,7 @@ impl QuadHelper {
     }
 
     #[inline]
-    /// 
+    ///
     pub fn get_aabb_center_add_half_loose<S: Scalar + RealField>(
         aabb: &AABB<S>,
         loose: &Vector2<S>,
@@ -157,5 +157,162 @@ impl QuadHelper {
             ),
             _ => AABB::new(p1, aabb.maxs),
         }
+    }
+}
+
+#[cfg(test)]
+mod quadtests {
+    use crate::*;
+    use map::vecmap::VecMap;
+    use map::Map;
+    use nalgebra::{Point2, RealField, Scalar, Vector2};
+    use ncollide2d::bounding_volume::{BoundingVolume, AABB};
+    use num_traits::Float;
+    use rand::Rng;
+    use slab::Slab;
+    use std::mem;
+    use time::Time;
+    crate::custom_dimension!(Point2 { x, y }, Vector2 { x, y }, AABB, QuadHelper, 4);
+
+    struct AbQueryArgs<S: Scalar + RealField + Float, T> {
+        aabb: AABB<S>,
+        result: Vec<(usize, T)>,
+    }
+
+    #[inline]
+    fn intersects<S: Scalar + RealField + Float>(a: &AABB<S>, b: &AABB<S>) -> bool {
+        a.intersects(b)
+    }
+    impl<S: Scalar + RealField + Float, T: Clone> AbQueryArgs<S, T> {
+        fn new(aabb: AABB<S>) -> AbQueryArgs<S, T> {
+            AbQueryArgs {
+                aabb: aabb,
+                result: Vec::new(),
+            }
+        }
+
+        fn result(&mut self) -> Vec<(usize, T)> {
+            mem::replace(&mut self.result, Vec::new())
+        }
+    }
+
+    fn ab_query_func<S: Scalar + RealField + Float, T: Clone>(
+        arg: &mut AbQueryArgs<S, T>,
+        id: usize,
+        aabb: &AABB<S>,
+        bind: &T,
+    ) {
+        if intersects(&arg.aabb, aabb) {
+            arg.result.push((id, bind.clone()));
+        }
+    }
+
+    #[test]
+    fn test() {
+        let max = Vector2::new(100f32, 100f32);
+        let min = max / 100f32;
+        let mut tree = Tree::new(
+            AABB::new(Point2::new(0f32, 0f32), Point2::new(1000f32, 1000f32)),
+            max,
+            min,
+            6,
+            8,
+            9999,
+        );
+        let ab_num = 5000;
+        let small_ab_num = (ab_num as f32 * 0.8) as usize;
+
+        for id in 0..small_ab_num as usize {
+            let point1 = Point2::new(
+                rand::thread_rng().gen_range(0, 999) as f32,
+                rand::thread_rng().gen_range(0, 999) as f32,
+            );
+            let point2 = Point2::new(point1.x + 1.0, point1.y + 1.0);
+
+            tree.add(id + 1, AABB::new(point1, point2), 1);
+        }
+
+        for id in small_ab_num + 1..ab_num {
+            let point1 = Point2::new(
+                rand::thread_rng().gen_range(1, 900) as f32,
+                rand::thread_rng().gen_range(1, 900) as f32,
+            );
+            let point2 = Point2::new(
+                point1.x + rand::thread_rng().gen_range(1, 100) as f32,
+                point1.y + rand::thread_rng().gen_range(1, 100) as f32,
+            );
+
+            tree.add(id + 1, AABB::new(point1, point2), 1);
+        }
+        tree.collect();
+
+        println!(
+            "AABBs Num: {}, ab_1: {:?}",
+            ab_num,
+            tree.ab_map.get(1).unwrap()
+        );
+
+        let point1 = Point2::new(
+            rand::thread_rng().gen_range(0, 999) as f32,
+            rand::thread_rng().gen_range(0, 999) as f32,
+        );
+        let point2 = Point2::new(point1.x + 1.0, point1.y + 1.0);
+        let start = Time::now(); //获取开始时间
+        tree.update(1, AABB::new(point1, point2));
+        let end = Time::now();
+        println!(
+            "update time:{:?}, ab_1: {:?},  ",
+            end - start,
+            tree.ab_map.get(1).unwrap()
+        );
+
+        let point1 = Point2::new(
+            rand::thread_rng().gen_range(0, 999) as f32,
+            rand::thread_rng().gen_range(0, 999) as f32,
+        );
+        let point2 = Point2::new(point1.x + 1.0, point1.y + 1.0);
+        let start = Time::now(); //获取开始时间
+        tree.add(ab_num + 2, AABB::new(point1, point2), 1);
+        let end = Time::now();
+        println!(
+            "add time:{:?}, ab_new: {:?},  ",
+            end - start,
+            tree.ab_map.get(ab_num + 2).unwrap()
+        );
+
+        let start = Time::now(); //获取开始时间
+        tree.remove(ab_num + 2);
+        let end = Time::now();
+        println!("remove time:{:?}  ", end - start);
+
+        let start = Time::now(); //获取开始时间
+        tree.collect();
+        let end = Time::now();
+        println!("collect time:{:?}  ", end - start);
+
+        let point1 = Point2::new(
+            rand::thread_rng().gen_range(1, 999) as f32,
+            rand::thread_rng().gen_range(1, 999) as f32,
+        );
+        let point2 = Point2::new(point1.x + 1.0, point1.y + 1.0);
+        let aabb = AABB::new(point1, point2);
+        let mut args: AbQueryArgs<f32, usize> = AbQueryArgs::new(aabb.clone());
+        let start = Time::now(); //获取开始时间
+        tree.query(&aabb, intersects, &mut args, ab_query_func);
+        let end = Time::now();
+        println!("narrow query time:{:?}  ", end - start);
+
+        let point1 = Point2::new(
+            rand::thread_rng().gen_range(1, 900) as f32,
+            rand::thread_rng().gen_range(1, 900) as f32,
+        );
+        let point2 = Point2::new(point1.x + 100.0, point1.y + 100.0);
+        let aabb = AABB::new(point1, point2);
+        let mut args: AbQueryArgs<f32, usize> = AbQueryArgs::new(aabb.clone());
+        let start = Time::now(); //获取开始时间
+        tree.query(&aabb, intersects, &mut args, ab_query_func);
+        let end = Time::now();
+        println!("wide query time:{:?}  ", end - start);
+
     }
 }

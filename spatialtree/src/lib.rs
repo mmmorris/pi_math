@@ -2,6 +2,9 @@
 //！采用二进制掩码 表达xyz的大小， child&1 == 0 表示x为小，否则为大。
 //！采用Slab，内部用偏移量来分配八叉节点。这样内存连续，八叉树本身可以快速拷贝。
 
+#![feature(test)]
+// extern crate test;
+
 pub mod oct_helper;
 pub mod quad_helper;
 
@@ -380,47 +383,11 @@ macro_rules! custom_dimension {
             }
 
             /// 检查碰撞对，不会检查outer的aabb。一般arg包含1个hashset，用(big, little)做键，判断是否已经计算过。
-            // pub fn collision<A>(
-            //     &self,
-            //     id: usize,
-            //     _limit_layer: usize,
-            //     arg: &mut A,
-            //     func: fn(
-            //         arg: &mut A,
-            //         a_id: usize,
-            //         a_aabb: &$AabbN<S>,
-            //         a_bind: &T,
-            //         b_id: usize,
-            //         b_aabb: &$AabbN<S>,
-            //         b_bind: &T,
-            //     ) -> bool,
-            // ) {
-            //     let a = match self.ab_map.get(id) {
-            //         Some(ab) => ab,
-            //         _ => return,
-            //     };
-            //     // 先判断root.nodes是否有节点，如果有则遍历root的nodes
-            //     let node = unsafe { self.branch_slab.get_unchecked(1) };
-            //     collision_list(
-            //         &self.ab_map,
-            //         id,
-            //         &a.aabb,
-            //         &a.bind,
-            //         arg,
-            //         func,
-            //         node.nodes.head,
-            //     );
-            //     // 和同列表节点碰撞
-            //     collision_list(&self.ab_map, id, &a.aabb, &a.bind, arg, func, a.next);
-            //     let mut prev = a.prev;
-            //     while prev > 0 {
-            //         let b = unsafe { self.ab_map.get_unchecked(prev) };
-            //         func(arg, id, &a.aabb, &a.bind, prev, &b.aabb, &b.bind);
-            //         prev = b.prev;
-            //     }
-            //     // 需要计算是否在重叠区，如果在，则需要上溯检查重叠的兄弟节点。不在，其实也需要上溯检查父的匹配节点，但可以提前计算ab节点的最小层
-            //     //}
-            // }
+            
+            #[inline]
+            pub fn get_ab_num(&self) -> usize {
+                self.ab_map.len()
+            }
         }
 
         //////////////////////////////////////////////////////本地/////////////////////////////////////////////////////////////////

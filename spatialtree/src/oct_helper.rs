@@ -44,7 +44,7 @@ impl OctHelper {
     }
 
     #[inline]
-     /// 判定指定向量是否小于最小“松散”尺寸
+    /// 判定指定向量是否小于最小“松散”尺寸
     pub fn smaller_than_min_loose<S: Scalar + RealField>(
         d: &Vector3<S>,
         min_loose: &Vector3<S>,
@@ -182,5 +182,171 @@ impl OctHelper {
             ),
             _ => AABB::new(p1, aabb.maxs),
         }
+    }
+}
+
+#[cfg(test)]
+mod octtests {
+    use crate::*;
+    use map::vecmap::VecMap;
+    use map::Map;
+    use nalgebra::{Point3, RealField, Scalar, Vector3};
+    use ncollide3d::bounding_volume::{BoundingVolume, AABB};
+    use num_traits::Float;
+    use rand::Rng;
+    use slab::Slab;
+    use std::mem;
+    use time::Time;
+    crate::custom_dimension!(Point3 { x, y, z }, Vector3 { x, y, z }, AABB, OctHelper, 8);
+
+    struct AbQueryArgs<S: Scalar + RealField + Float, T> {
+        aabb: AABB<S>,
+        result: Vec<(usize, T)>,
+    }
+
+    #[inline]
+    fn intersects<S: Scalar + RealField + Float>(a: &AABB<S>, b: &AABB<S>) -> bool {
+        a.intersects(b)
+    }
+    impl<S: Scalar + RealField + Float, T: Clone> AbQueryArgs<S, T> {
+        fn new(aabb: AABB<S>) -> AbQueryArgs<S, T> {
+            AbQueryArgs {
+                aabb: aabb,
+                result: Vec::with_capacity(100),
+            }
+        }
+
+        fn result(&mut self) -> Vec<(usize, T)> {
+            mem::replace(&mut self.result, Vec::new())
+        }
+    }
+
+    fn ab_query_func<S: Scalar + RealField + Float, T: Clone>(
+        arg: &mut AbQueryArgs<S, T>,
+        id: usize,
+        aabb: &AABB<S>,
+        bind: &T,
+    ) {
+        if intersects(&arg.aabb, aabb) {
+            arg.result.push((id, bind.clone()));
+        }
+    }
+
+    #[test]
+    fn test_oct() {
+        let max = Vector3::new(100f32, 100f32, 100f32);
+        let min = max / 100f32;
+        let mut tree = Tree::new(
+            AABB::new(
+                Point3::new(0f32, 0f32, 0f32),
+                Point3::new(1000f32, 1000f32, 1000f32),
+            ),
+            
+            max,
+            min,
+            6,
+            8,
+            50,
+        );
+        let ab_num = 100000;
+        let query_times = 100;
+        let small_ab_num = (ab_num as f32 * 0.8) as usize;
+
+        let mut aabbs = Vec::with_capacity(ab_num);
+        for id in 0..small_ab_num as usize {
+            let point1 = Point3::new(
+                rand::thread_rng().gen_range(0, 999) as f32,
+                rand::thread_rng().gen_range(0, 999) as f32,
+                rand::thread_rng().gen_range(0, 999) as f32,
+            );
+            let point2 = Point3::new(point1.x + 1.0, point1.y + 1.0, point1.z + 1.0);
+            aabbs.push(AABB::new(point1, point2));
+            // tree.add(id + 1, AABB::new(point1, point2), 1);
+        }
+
+        for id in small_ab_num..ab_num {
+            let point1 = Point3::new(
+                rand::thread_rng().gen_range(0, 900) as f32,
+                rand::thread_rng().gen_range(0, 900) as f32,
+                rand::thread_rng().gen_range(0, 900) as f32,
+            );
+            let point2 = Point3::new(
+                point1.x + rand::thread_rng().gen_range(1, 100) as f32,
+                point1.y + rand::thread_rng().gen_range(1, 100) as f32,
+                point1.z + rand::thread_rng().gen_range(1, 100) as f32,
+            );
+            aabbs.push(AABB::new(point1, point2));
+            // tree.add(id + 1, AABB::new(point1, point2), 1);
+        }
+        let start = Time::now(); //获取开始时间
+        for idx in 0..ab_num {
+            tree.add(idx + 1, aabbs[idx], 1);
+        }
+        let end = Time::now();
+        println!("insert time:{:?},  ", end - start,);
+
+        let start = Time::now(); //获取开始时间
+        tree.collect();
+        let end = Time::now();
+        println!("collect time:{:?}  ", end - start);
+
+        let point1 = Point3::new(500.0, 500.0, 500.0);
+        let point2 = Point3::new(point1.x + 1.0, point1.y + 1.0, point1.z + 1.0);
+        let aabb = AABB::new(point1, point2);
+        let mut args: AbQueryArgs<f32, usize> = AbQueryArgs::new(aabb.clone());
+        let start = Time::now(); //获取开始时间
+        for _ in 0..query_times {
+            args.result.clear();
+            tree.query(&aabb, intersects, &mut args, ab_query_func);
+        }
+        let end = Time::now();
+        println!("narrow query time:{:?}  ,find num: {}", end - start, args.result.len());
+
+        let point1 = Point3::new(500.0, 500.0, 500.0);
+        let point2 = Point3::new(point1.x + 100.0, point1.y + 100.0, point1.z + 100.0);
+        let aabb = AABB::new(point1, point2);
+        let mut args: AbQueryArgs<f32, usize> = AbQueryArgs::new(aabb.clone());
+        let start = Time::now(); //获取开始时间
+        for _ in 0..query_times {
+            args.result.clear();
+            tree.query(&aabb, intersects, &mut args, ab_query_func);
+        }
+        let end = Time::now();
+        println!("wide query time:{:?}  ,find num: {}", end - start, args.result.len());
+
+        aabbs.clear();
+        for id in 0..small_ab_num as usize {
+            let point1 = Point3::new(
+                rand::thread_rng().gen_range(0, 999) as f32,
+                rand::thread_rng().gen_range(0, 999) as f32,
+                rand::thread_rng().gen_range(0, 999) as f32,
+            );
+            let point2 = Point3::new(point1.x + 1.0, point1.y + 1.0, point1.z + 1.0);
+            aabbs.push(AABB::new(point1, point2));
+            // tree.add(id + 1, AABB::new(point1, point2), 1);
+        }
+        
+        let start = Time::now(); //获取开始时间
+        for idx in 0..small_ab_num {
+            tree.update(idx + 1, aabbs[idx]);
+        }
+        let end = Time::now();
+        println!(
+            "update time:{:?},  ",
+            end - start,
+        );
+
+        let start = Time::now(); //获取开始时间
+        for id in 0..ab_num {
+            tree.remove(id + 1);
+        }
+        
+        let end = Time::now();
+        println!("remove time:{:?}  ", end - start);
+
+        let start = Time::now(); //获取开始时间
+        tree.collect();
+        let end = Time::now();
+        println!("collect time:{:?}  ", end - start);
     }
 }
